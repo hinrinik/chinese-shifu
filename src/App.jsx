@@ -1,552 +1,203 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
+import { initializeApp } from "firebase/app";
+import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged } from "firebase/auth";
+import { getFirestore, doc, getDoc, setDoc } from "firebase/firestore";
+import { BOOK1_WORDS, BOOK1_DIALOGUES, BOOK1_CH_TITLES } from "./book1-vocabulary.js";
 
-const BOOK_WORDS = [
-  // === HEALTH & ILLNESS (Lesson: Getting Sick) ===
-  { id: 1, hanzi: "生病", pinyin: "shēng bìng", english: "to get sick", category: "health & illness" },
-  { id: 2, hanzi: "感冒", pinyin: "gǎnmào", english: "to have a cold", category: "health & illness" },
-  { id: 3, hanzi: "身体", pinyin: "shēntǐ", english: "body, health", category: "health & illness" },
-  { id: 4, hanzi: "痒", pinyin: "yǎng", english: "itchy", category: "health & illness" },
-  { id: 5, hanzi: "过敏", pinyin: "guòmǐn", english: "to be allergic to", category: "health & illness" },
-  { id: 6, hanzi: "药店", pinyin: "yàodiàn", english: "pharmacy", category: "health & illness" },
-  { id: 7, hanzi: "健康", pinyin: "jiànkāng", english: "healthy; health", category: "health & illness" },
-  { id: 8, hanzi: "保险", pinyin: "bǎoxiǎn", english: "insurance; secure", category: "health & illness" },
-  { id: 9, hanzi: "赶快", pinyin: "gǎnkuài", english: "right away, quickly", category: "health & illness" },
-  { id: 10, hanzi: "要不然", pinyin: "yàobùrán", english: "otherwise", category: "health & illness" },
-  { id: 11, hanzi: "越来越", pinyin: "yuè lái yuè", english: "more and more", category: "health & illness" },
-  { id: 12, hanzi: "上次", pinyin: "shàng cì", english: "last time", category: "health & illness" },
-  { id: 13, hanzi: "休息", pinyin: "xiūxi", english: "to take a break, to rest", category: "health & illness" },
-  { id: 14, hanzi: "懒", pinyin: "lǎn", english: "lazy", category: "health & illness" },
-  { id: 15, hanzi: "再说", pinyin: "zàishuō", english: "moreover", category: "health & illness" },
-  { id: 16, hanzi: "乱", pinyin: "luàn", english: "randomly, messily", category: "health & illness" },
-  { id: 17, hanzi: "药", pinyin: "yào", english: "medicine", category: "health & illness" },
-  { id: 18, hanzi: "片", pinyin: "piàn", english: "(measure word for tablets)", category: "health & illness" },
-  { id: 19, hanzi: "遍", pinyin: "biàn", english: "(measure word for complete courses of action)", category: "health & illness" },
-  { id: 20, hanzi: "最好", pinyin: "zuìhǎo", english: "had better", category: "health & illness" },
-  { id: 21, hanzi: "小时", pinyin: "xiǎoshí", english: "hour", category: "health & illness" },
-  { id: 22, hanzi: "办法", pinyin: "bànfǎ", english: "method, way", category: "health & illness" },
+const firebaseConfig = {apiKey:"AIzaSyB_3Mk9PwDV8bse39j9eAZ1ObADU22Ri1I",authDomain:"chinese-shufu.firebaseapp.com",projectId:"chinese-shufu",storageBucket:"chinese-shufu.firebasestorage.app",messagingSenderId:"514368919622",appId:"1:514368919622:web:268230647169821359d247",measurementId:"G-SEZLYZHVFT"};
+const app=initializeApp(firebaseConfig);const auth=getAuth(app);const db=getFirestore(app);const gProv=new GoogleAuthProvider();
 
-  // === SEEING A DOCTOR ===
-  { id: 23, hanzi: "病人", pinyin: "bìngrén", english: "patient", category: "seeing a doctor" },
-  { id: 24, hanzi: "病", pinyin: "bìng", english: "illness; to get sick", category: "seeing a doctor" },
-  { id: 25, hanzi: "医院", pinyin: "yīyuàn", english: "hospital", category: "seeing a doctor" },
-  { id: 26, hanzi: "看病", pinyin: "kàn bìng", english: "to see a doctor", category: "seeing a doctor" },
-  { id: 27, hanzi: "肚子", pinyin: "dùzi", english: "belly, abdomen, stomach", category: "seeing a doctor" },
-  { id: 28, hanzi: "疼死", pinyin: "téng sǐ", english: "really painful", category: "seeing a doctor" },
-  { id: 29, hanzi: "疼", pinyin: "téng", english: "aching", category: "seeing a doctor" },
-  { id: 30, hanzi: "死", pinyin: "sǐ", english: "to die; (extreme degree)", category: "seeing a doctor" },
-  { id: 31, hanzi: "夜里", pinyin: "yè li", english: "at night", category: "seeing a doctor" },
-  { id: 32, hanzi: "好几", pinyin: "hǎo jǐ", english: "quite a few", category: "seeing a doctor" },
-  { id: 33, hanzi: "厕所", pinyin: "cèsuǒ", english: "restroom, toilet", category: "seeing a doctor" },
-  { id: 34, hanzi: "把", pinyin: "bǎ", english: "(disposition/arrangement particle)", category: "seeing a doctor" },
-  { id: 35, hanzi: "冰箱", pinyin: "bīngxiāng", english: "refrigerator", category: "seeing a doctor" },
-  { id: 36, hanzi: "发烧", pinyin: "fā shāo", english: "to have a fever", category: "seeing a doctor" },
-  { id: 37, hanzi: "躺下", pinyin: "tǎng xia", english: "to lie down", category: "seeing a doctor" },
-  { id: 38, hanzi: "躺", pinyin: "tǎng", english: "to lie, to recline", category: "seeing a doctor" },
-  { id: 39, hanzi: "检查", pinyin: "jiǎnchá", english: "to examine", category: "seeing a doctor" },
-  { id: 40, hanzi: "吃坏", pinyin: "chī huài", english: "to get sick from bad food", category: "seeing a doctor" },
-  { id: 41, hanzi: "坏", pinyin: "huài", english: "bad", category: "seeing a doctor" },
-  { id: 42, hanzi: "打针", pinyin: "dǎ zhēn", english: "to get an injection", category: "seeing a doctor" },
-  { id: 43, hanzi: "针", pinyin: "zhēn", english: "needle", category: "seeing a doctor" },
-
-  // === APPEARANCE & DESCRIPTIONS ===
-  { id: 44, hanzi: "钟头", pinyin: "zhōngtóu", english: "hour", category: "appearance" },
-  { id: 45, hanzi: "以为", pinyin: "yǐwéi", english: "to assume erroneously", category: "appearance" },
-  { id: 46, hanzi: "聪明", pinyin: "cōngming", english: "smart, bright, clever", category: "appearance" },
-  { id: 47, hanzi: "用功", pinyin: "yònggōng", english: "hardworking, diligent", category: "appearance" },
-  { id: 48, hanzi: "暑期", pinyin: "shǔqī", english: "summer term", category: "appearance" },
-  { id: 49, hanzi: "班", pinyin: "bān", english: "class", category: "appearance" },
-  { id: 50, hanzi: "长", pinyin: "zhǎng", english: "to grow, to appear", category: "appearance" },
-  { id: 51, hanzi: "可爱", pinyin: "kě'ài", english: "cute, lovable", category: "appearance" },
-  { id: 52, hanzi: "去年", pinyin: "qùnián", english: "last year", category: "appearance" },
-  { id: 53, hanzi: "属", pinyin: "shǔ", english: "to belong to", category: "appearance" },
-  { id: 54, hanzi: "狗", pinyin: "gǒu", english: "dog", category: "appearance" },
-  { id: 55, hanzi: "脸", pinyin: "liǎn", english: "face", category: "appearance" },
-  { id: 56, hanzi: "圆", pinyin: "yuán", english: "round", category: "appearance" },
-  { id: 57, hanzi: "眼睛", pinyin: "yǎnjing", english: "eye", category: "appearance" },
-  { id: 58, hanzi: "鼻子", pinyin: "bízi", english: "nose", category: "appearance" },
-  { id: 59, hanzi: "嘴", pinyin: "zuǐ", english: "mouth", category: "appearance" },
-  { id: 60, hanzi: "像", pinyin: "xiàng", english: "to be like, to look like", category: "appearance" },
-  { id: 61, hanzi: "长大", pinyin: "zhǎng dà", english: "to grow up", category: "appearance" },
-  { id: 62, hanzi: "一定", pinyin: "yídìng", english: "certain; certainly, definitely", category: "appearance" },
-  { id: 63, hanzi: "蛋糕", pinyin: "dàngāo", english: "cake", category: "appearance" },
-  { id: 64, hanzi: "最", pinyin: "zuì", english: "most, (superlative) -est", category: "appearance" },
-
-  // === CELEBRATIONS & GIFTS ===
-  { id: 65, hanzi: "过", pinyin: "guò", english: "to celebrate; to live (a life)", category: "celebrations" },
-  { id: 66, hanzi: "舞会", pinyin: "wǔhuì", english: "dance party, ball", category: "celebrations" },
-  { id: 67, hanzi: "表姐", pinyin: "biǎojiě", english: "older female cousin", category: "celebrations" },
-  { id: 68, hanzi: "中学", pinyin: "zhōngxué", english: "middle school", category: "celebrations" },
-  { id: 69, hanzi: "送", pinyin: "sòng", english: "to give as a gift", category: "celebrations" },
-  { id: 70, hanzi: "礼物", pinyin: "lǐwù", english: "gift, present", category: "celebrations" },
-  { id: 71, hanzi: "本", pinyin: "běn", english: "(measure word for books)", category: "celebrations" },
-  { id: 72, hanzi: "饮料", pinyin: "yǐnliào", english: "beverage", category: "celebrations" },
-  { id: 73, hanzi: "水果", pinyin: "shuǐguǒ", english: "fruit", category: "celebrations" },
-  { id: 74, hanzi: "花", pinyin: "huā", english: "flower", category: "celebrations" },
-  { id: 75, hanzi: "爱", pinyin: "ài", english: "to love, to like", category: "celebrations" },
-  { id: 76, hanzi: "苹果", pinyin: "píngguǒ", english: "apple", category: "celebrations" },
-  { id: 77, hanzi: "梨", pinyin: "lí", english: "pear", category: "celebrations" },
-  { id: 78, hanzi: "西瓜", pinyin: "xīgua", english: "watermelon", category: "celebrations" },
-  { id: 79, hanzi: "住", pinyin: "zhù", english: "to live (in a place)", category: "celebrations" },
-  { id: 80, hanzi: "重", pinyin: "zhòng", english: "heavy, serious", category: "celebrations" },
-  { id: 81, hanzi: "接", pinyin: "jiē", english: "to catch, to meet, to welcome", category: "celebrations" },
-  { id: 82, hanzi: "楼", pinyin: "lóu", english: "building, floor", category: "celebrations" },
-
-  // === DIRECTIONS & NAVIGATION ===
-  { id: 83, hanzi: "中国城", pinyin: "Zhōngguóchéng", english: "Chinatown", category: "directions" },
-  { id: 84, hanzi: "城", pinyin: "chéng", english: "town, city", category: "directions" },
-  { id: 85, hanzi: "地图", pinyin: "dìtú", english: "map", category: "directions" },
-  { id: 86, hanzi: "拿", pinyin: "ná", english: "to take, to get", category: "directions" },
-  { id: 87, hanzi: "次", pinyin: "cì", english: "(measure word for frequency)", category: "directions" },
-  { id: 88, hanzi: "从", pinyin: "cóng", english: "from", category: "directions" },
-  { id: 89, hanzi: "一直", pinyin: "yìzhí", english: "straight, continuously", category: "directions" },
-  { id: 90, hanzi: "往", pinyin: "wǎng", english: "towards", category: "directions" },
-  { id: 91, hanzi: "南", pinyin: "nán", english: "south", category: "directions" },
-  { id: 92, hanzi: "路口", pinyin: "lùkǒu", english: "intersection", category: "directions" },
-  { id: 93, hanzi: "西", pinyin: "xī", english: "west", category: "directions" },
-  { id: 94, hanzi: "拐", pinyin: "guǎi", english: "to turn", category: "directions" },
-  { id: 95, hanzi: "哎", pinyin: "āi", english: "(exclamation of surprise)", category: "directions" },
-  { id: 96, hanzi: "东", pinyin: "dōng", english: "east", category: "directions" },
-  { id: 97, hanzi: "北", pinyin: "běi", english: "north", category: "directions" },
-  { id: 98, hanzi: "前", pinyin: "qián", english: "forward, ahead", category: "directions" },
-  { id: 99, hanzi: "红绿灯", pinyin: "hónglǜdēng", english: "traffic light", category: "directions" },
-  { id: 100, hanzi: "灯", pinyin: "dēng", english: "light", category: "directions" },
-  { id: 101, hanzi: "右", pinyin: "yòu", english: "right", category: "directions" },
-  { id: 102, hanzi: "左", pinyin: "zuǒ", english: "left", category: "directions" },
-  { id: 103, hanzi: "前面", pinyin: "qiánmiàn", english: "ahead, in front of", category: "directions" },
-
-  // === CAMPUS & PLACES ===
-  { id: 104, hanzi: "上", pinyin: "shàng", english: "to go (colloq.)", category: "campus & places" },
-  { id: 105, hanzi: "中心", pinyin: "zhōngxīn", english: "center", category: "campus & places" },
-  { id: 106, hanzi: "听说", pinyin: "tīngshuō", english: "to be told, to hear of", category: "campus & places" },
-  { id: 107, hanzi: "运动", pinyin: "yùndòng", english: "sports", category: "campus & places" },
-  { id: 108, hanzi: "场", pinyin: "chǎng", english: "field", category: "campus & places" },
-  { id: 109, hanzi: "旁边", pinyin: "pángbiān", english: "side", category: "campus & places" },
-  { id: 110, hanzi: "远", pinyin: "yuǎn", english: "far", category: "campus & places" },
-  { id: 111, hanzi: "离", pinyin: "lí", english: "away from", category: "campus & places" },
-  { id: 112, hanzi: "近", pinyin: "jìn", english: "near", category: "campus & places" },
-  { id: 113, hanzi: "活动", pinyin: "huódòng", english: "activity", category: "campus & places" },
-  { id: 114, hanzi: "中间", pinyin: "zhōngjiān", english: "middle", category: "campus & places" },
-  { id: 115, hanzi: "书店", pinyin: "shūdiàn", english: "bookstore", category: "campus & places" },
-  { id: 116, hanzi: "地方", pinyin: "dìfang", english: "place", category: "campus & places" },
-  { id: 117, hanzi: "里边", pinyin: "lǐbian", english: "inside", category: "campus & places" },
-  { id: 118, hanzi: "清楚", pinyin: "qīngchu", english: "clear", category: "campus & places" },
-  { id: 119, hanzi: "没关系", pinyin: "méi guānxi", english: "it doesn't matter", category: "campus & places" },
-
-  // === FOOD & COOKING ===
-  { id: 120, hanzi: "师傅", pinyin: "shīfu", english: "master worker", category: "food & cooking" },
-  { id: 121, hanzi: "好吃", pinyin: "hǎochī", english: "delicious", category: "food & cooking" },
-  { id: 122, hanzi: "糖醋鱼", pinyin: "tángcùyú", english: "sweet-and-sour fish", category: "food & cooking" },
-  { id: 123, hanzi: "糖", pinyin: "táng", english: "sugar", category: "food & cooking" },
-  { id: 124, hanzi: "醋", pinyin: "cù", english: "vinegar", category: "food & cooking" },
-  { id: 125, hanzi: "甜", pinyin: "tián", english: "sweet", category: "food & cooking" },
-  { id: 126, hanzi: "酸", pinyin: "suān", english: "sour", category: "food & cooking" },
-  { id: 127, hanzi: "极", pinyin: "jí", english: "extremely", category: "food & cooking" },
-  { id: 128, hanzi: "红烧", pinyin: "hóngshāo", english: "to braise in soy sauce", category: "food & cooking" },
-  { id: 129, hanzi: "牛肉", pinyin: "niúròu", english: "beef", category: "food & cooking" },
-  { id: 130, hanzi: "牛", pinyin: "niú", english: "cow, ox", category: "food & cooking" },
-  { id: 131, hanzi: "鱼", pinyin: "yú", english: "fish", category: "food & cooking" },
-  { id: 132, hanzi: "凉拌", pinyin: "liángbàn", english: "cold tossed (food)", category: "food & cooking" },
-  { id: 133, hanzi: "黄瓜", pinyin: "huánggua", english: "cucumber", category: "food & cooking" },
-  { id: 134, hanzi: "米饭", pinyin: "mǐfàn", english: "cooked rice", category: "food & cooking" },
-  { id: 135, hanzi: "忘", pinyin: "wàng", english: "to forget", category: "food & cooking" },
-  { id: 136, hanzi: "带", pinyin: "dài", english: "to bring, to carry", category: "food & cooking" },
-  { id: 137, hanzi: "饭卡", pinyin: "fànkǎ", english: "meal card", category: "food & cooking" },
-  { id: 138, hanzi: "错", pinyin: "cuò", english: "wrong", category: "food & cooking" },
-  { id: 139, hanzi: "卖完", pinyin: "mài wán", english: "to be sold out", category: "food & cooking" },
-  { id: 140, hanzi: "完", pinyin: "wán", english: "finished", category: "food & cooking" },
-  { id: 141, hanzi: "青菜", pinyin: "qīngcài", english: "green, leafy vegetable", category: "food & cooking" },
-  { id: 142, hanzi: "冰茶", pinyin: "bīngchá", english: "iced tea", category: "food & cooking" },
-  { id: 143, hanzi: "冰", pinyin: "bīng", english: "ice", category: "food & cooking" },
-  { id: 144, hanzi: "渴", pinyin: "kě", english: "thirsty", category: "food & cooking" },
-  { id: 145, hanzi: "些", pinyin: "xiē", english: "some (measure word)", category: "food & cooking" },
-  { id: 146, hanzi: "够", pinyin: "gòu", english: "enough", category: "food & cooking" },
-  { id: 147, hanzi: "饿", pinyin: "è", english: "hungry", category: "food & cooking" },
-  { id: 148, hanzi: "上菜", pinyin: "shàng cài", english: "to serve food", category: "food & cooking" },
-
-  // === RESTAURANT & DINING ===
-  { id: 149, hanzi: "饭馆", pinyin: "fànguǎn", english: "restaurant", category: "restaurant" },
-  { id: 150, hanzi: "好像", pinyin: "hǎoxiàng", english: "to seem, to be like", category: "restaurant" },
-  { id: 151, hanzi: "位子", pinyin: "wèizi", english: "seat", category: "restaurant" },
-  { id: 152, hanzi: "服务员", pinyin: "fúwùyuán", english: "waiter, attendant", category: "restaurant" },
-  { id: 153, hanzi: "服务", pinyin: "fúwù", english: "to serve, to provide service", category: "restaurant" },
-  { id: 154, hanzi: "桌子", pinyin: "zhuōzi", english: "table", category: "restaurant" },
-  { id: 155, hanzi: "点菜", pinyin: "diǎn cài", english: "to order food", category: "restaurant" },
-  { id: 156, hanzi: "盘", pinyin: "pán", english: "plate, dish", category: "restaurant" },
-  { id: 157, hanzi: "饺子", pinyin: "jiǎozi", english: "dumplings", category: "restaurant" },
-  { id: 158, hanzi: "素", pinyin: "sù", english: "vegetarian", category: "restaurant" },
-  { id: 159, hanzi: "家常", pinyin: "jiācháng", english: "home-style", category: "restaurant" },
-  { id: 160, hanzi: "豆腐", pinyin: "dòufu", english: "tofu, bean curd", category: "restaurant" },
-  { id: 161, hanzi: "放", pinyin: "fàng", english: "to put, to place", category: "restaurant" },
-  { id: 162, hanzi: "肉", pinyin: "ròu", english: "meat", category: "restaurant" },
-  { id: 163, hanzi: "碗", pinyin: "wǎn", english: "bowl", category: "restaurant" },
-  { id: 164, hanzi: "酸辣汤", pinyin: "suānlàtāng", english: "hot-and-sour soup", category: "restaurant" },
-  { id: 165, hanzi: "辣", pinyin: "là", english: "spicy, hot", category: "restaurant" },
-  { id: 166, hanzi: "汤", pinyin: "tāng", english: "soup", category: "restaurant" },
-  { id: 167, hanzi: "味精", pinyin: "wèijīng", english: "MSG", category: "restaurant" },
-  { id: 168, hanzi: "盐", pinyin: "yán", english: "salt", category: "restaurant" },
-  { id: 169, hanzi: "小白菜", pinyin: "xiǎo báicài", english: "baby bok choy", category: "restaurant" },
-  { id: 170, hanzi: "刚", pinyin: "gāng", english: "just", category: "restaurant" },
-
-  // === WEATHER & SEASONS ===
-  { id: 171, hanzi: "那么", pinyin: "nàme", english: "so, such", category: "weather & seasons" },
-  { id: 172, hanzi: "好玩儿", pinyin: "hǎowánr", english: "fun, amusing", category: "weather & seasons" },
-  { id: 173, hanzi: "非常", pinyin: "fēicháng", english: "very, extremely", category: "weather & seasons" },
-  { id: 174, hanzi: "糟糕", pinyin: "zāogāo", english: "terrible, how terrible", category: "weather & seasons" },
-  { id: 175, hanzi: "下雨", pinyin: "xià yǔ", english: "to rain", category: "weather & seasons" },
-  { id: 176, hanzi: "又", pinyin: "yòu", english: "again", category: "weather & seasons" },
-  { id: 177, hanzi: "面试", pinyin: "miànshì", english: "interview", category: "weather & seasons" },
-  { id: 178, hanzi: "回去", pinyin: "huí qu", english: "to go back, to return", category: "weather & seasons" },
-  { id: 179, hanzi: "冬天", pinyin: "dōngtiān", english: "winter", category: "weather & seasons" },
-  { id: 180, hanzi: "夏天", pinyin: "xiàtiān", english: "summer", category: "weather & seasons" },
-  { id: 181, hanzi: "热", pinyin: "rè", english: "hot", category: "weather & seasons" },
-  { id: 182, hanzi: "春天", pinyin: "chūntiān", english: "spring", category: "weather & seasons" },
-  { id: 183, hanzi: "秋天", pinyin: "qiūtiān", english: "autumn, fall", category: "weather & seasons" },
-  { id: 184, hanzi: "舒服", pinyin: "shūfu", english: "comfortable", category: "weather & seasons" },
-  { id: 185, hanzi: "天气", pinyin: "tiānqì", english: "weather", category: "weather & seasons" },
-  { id: 186, hanzi: "比", pinyin: "bǐ", english: "compared with; to compare", category: "weather & seasons" },
-  { id: 187, hanzi: "下雪", pinyin: "xià xuě", english: "to snow", category: "weather & seasons" },
-  { id: 188, hanzi: "约", pinyin: "yuē", english: "to make an appointment", category: "weather & seasons" },
-  { id: 189, hanzi: "公园", pinyin: "gōngyuán", english: "park", category: "weather & seasons" },
-  { id: 190, hanzi: "滑冰", pinyin: "huá bīng", english: "to ice skate", category: "weather & seasons" },
-  { id: 191, hanzi: "会", pinyin: "huì", english: "will", category: "weather & seasons" },
-  { id: 192, hanzi: "冷", pinyin: "lěng", english: "cold", category: "weather & seasons" },
-  { id: 193, hanzi: "刚才", pinyin: "gāngcái", english: "just now, a moment ago", category: "weather & seasons" },
-  { id: 194, hanzi: "网上", pinyin: "wǎng shang", english: "on the Internet", category: "weather & seasons" },
-  { id: 195, hanzi: "预报", pinyin: "yùbào", english: "to forecast; forecast", category: "weather & seasons" },
-  { id: 196, hanzi: "更", pinyin: "gèng", english: "even more", category: "weather & seasons" },
-  { id: 197, hanzi: "不但…而且…", pinyin: "búdàn…érqiě…", english: "not only…but also…", category: "weather & seasons" },
-  { id: 198, hanzi: "暖和", pinyin: "nuǎnhuo", english: "warm", category: "weather & seasons" },
-  { id: 199, hanzi: "办", pinyin: "bàn", english: "to handle, to do", category: "weather & seasons" },
+const AW=[
+// Book 1 — Chapters 1-10
+...BOOK1_WORDS,
+// Ch11 D1
+{id:185,h:"天气",p:"tiānqì",e:"weather",g:"ch11d1"},{id:186,h:"比",p:"bǐ",e:"compared with",g:"ch11d1"},{id:187,h:"下雪",p:"xià xuě",e:"to snow",g:"ch11d1"},{id:188,h:"约",p:"yuē",e:"to make an appointment",g:"ch11d1"},{id:189,h:"公园",p:"gōngyuán",e:"park",g:"ch11d1"},{id:190,h:"滑冰",p:"huá bīng",e:"to ice skate",g:"ch11d1"},{id:191,h:"会",p:"huì",e:"will",g:"ch11d1"},{id:192,h:"冷",p:"lěng",e:"cold",g:"ch11d1"},{id:193,h:"刚才",p:"gāngcái",e:"just now",g:"ch11d1"},{id:194,h:"网上",p:"wǎng shang",e:"on the Internet",g:"ch11d1"},{id:195,h:"预报",p:"yùbào",e:"forecast",g:"ch11d1"},{id:196,h:"更",p:"gèng",e:"even more",g:"ch11d1"},{id:197,h:"不但…而且…",p:"búdàn…érqiě…",e:"not only…but also…",g:"ch11d1"},{id:198,h:"暖和",p:"nuǎnhuo",e:"warm",g:"ch11d1"},{id:199,h:"办",p:"bàn",e:"to handle, to do",g:"ch11d1"},
+// Ch11 D2
+{id:171,h:"那么",p:"nàme",e:"so, such",g:"ch11d2"},{id:172,h:"好玩儿",p:"hǎowánr",e:"fun, amusing",g:"ch11d2"},{id:173,h:"非常",p:"fēicháng",e:"very, extremely",g:"ch11d2"},{id:174,h:"糟糕",p:"zāogāo",e:"terrible",g:"ch11d2"},{id:175,h:"下雨",p:"xià yǔ",e:"to rain",g:"ch11d2"},{id:176,h:"又",p:"yòu",e:"again",g:"ch11d2"},{id:177,h:"面试",p:"miànshì",e:"interview",g:"ch11d2"},{id:178,h:"回去",p:"huí qu",e:"to go back",g:"ch11d2"},{id:179,h:"冬天",p:"dōngtiān",e:"winter",g:"ch11d2"},{id:180,h:"夏天",p:"xiàtiān",e:"summer",g:"ch11d2"},{id:181,h:"热",p:"rè",e:"hot",g:"ch11d2"},{id:182,h:"春天",p:"chūntiān",e:"spring",g:"ch11d2"},{id:183,h:"秋天",p:"qiūtiān",e:"autumn, fall",g:"ch11d2"},{id:184,h:"舒服",p:"shūfu",e:"comfortable",g:"ch11d2"},{id:203,h:"加州",p:"Jiāzhōu",e:"California",g:"ch11d2"},
+// Ch12 D1
+{id:149,h:"饭馆",p:"fànguǎn",e:"restaurant",g:"ch12d1"},{id:150,h:"好像",p:"hǎoxiàng",e:"to seem",g:"ch12d1"},{id:151,h:"位子",p:"wèizi",e:"seat",g:"ch12d1"},{id:152,h:"服务员",p:"fúwùyuán",e:"waiter",g:"ch12d1"},{id:153,h:"服务",p:"fúwù",e:"to serve",g:"ch12d1"},{id:154,h:"桌子",p:"zhuōzi",e:"table",g:"ch12d1"},{id:155,h:"点菜",p:"diǎn cài",e:"to order food",g:"ch12d1"},{id:156,h:"盘",p:"pán",e:"plate, dish",g:"ch12d1"},{id:157,h:"饺子",p:"jiǎozi",e:"dumplings",g:"ch12d1"},{id:158,h:"素",p:"sù",e:"vegetarian",g:"ch12d1"},{id:159,h:"家常",p:"jiācháng",e:"home-style",g:"ch12d1"},{id:160,h:"豆腐",p:"dòufu",e:"tofu",g:"ch12d1"},{id:161,h:"放",p:"fàng",e:"to put, to place",g:"ch12d1"},{id:162,h:"肉",p:"ròu",e:"meat",g:"ch12d1"},{id:163,h:"碗",p:"wǎn",e:"bowl",g:"ch12d1"},{id:164,h:"酸辣汤",p:"suānlàtāng",e:"hot-and-sour soup",g:"ch12d1"},{id:165,h:"辣",p:"là",e:"spicy, hot",g:"ch12d1"},{id:166,h:"汤",p:"tāng",e:"soup",g:"ch12d1"},{id:167,h:"味精",p:"wèijīng",e:"MSG",g:"ch12d1"},{id:168,h:"盐",p:"yán",e:"salt",g:"ch12d1"},{id:169,h:"小白菜",p:"xiǎo báicài",e:"baby bok choy",g:"ch12d1"},{id:170,h:"刚",p:"gāng",e:"just",g:"ch12d1"},{id:139,h:"卖完",p:"mài wán",e:"to be sold out",g:"ch12d1"},{id:140,h:"完",p:"wán",e:"finished",g:"ch12d1"},{id:141,h:"青菜",p:"qīngcài",e:"leafy vegetable",g:"ch12d1"},{id:142,h:"冰茶",p:"bīngchá",e:"iced tea",g:"ch12d1"},{id:143,h:"冰",p:"bīng",e:"ice",g:"ch12d1"},{id:144,h:"渴",p:"kě",e:"thirsty",g:"ch12d1"},{id:145,h:"些",p:"xiē",e:"some",g:"ch12d1"},{id:146,h:"够",p:"gòu",e:"enough",g:"ch12d1"},{id:147,h:"饿",p:"è",e:"hungry",g:"ch12d1"},{id:148,h:"上菜",p:"shàng cài",e:"to serve food",g:"ch12d1"},
+// Ch12 D2
+{id:120,h:"师傅",p:"shīfu",e:"master worker",g:"ch12d2"},{id:121,h:"好吃",p:"hǎochī",e:"delicious",g:"ch12d2"},{id:122,h:"糖醋鱼",p:"tángcùyú",e:"sweet-and-sour fish",g:"ch12d2"},{id:123,h:"糖",p:"táng",e:"sugar",g:"ch12d2"},{id:124,h:"醋",p:"cù",e:"vinegar",g:"ch12d2"},{id:125,h:"甜",p:"tián",e:"sweet",g:"ch12d2"},{id:126,h:"酸",p:"suān",e:"sour",g:"ch12d2"},{id:127,h:"极",p:"jí",e:"extremely",g:"ch12d2"},{id:128,h:"红烧",p:"hóngshāo",e:"to braise in soy sauce",g:"ch12d2"},{id:129,h:"牛肉",p:"niúròu",e:"beef",g:"ch12d2"},{id:130,h:"牛",p:"niú",e:"cow, ox",g:"ch12d2"},{id:131,h:"鱼",p:"yú",e:"fish",g:"ch12d2"},{id:132,h:"凉拌",p:"liángbàn",e:"cold tossed (food)",g:"ch12d2"},{id:133,h:"黄瓜",p:"huánggua",e:"cucumber",g:"ch12d2"},{id:134,h:"米饭",p:"mǐfàn",e:"cooked rice",g:"ch12d2"},{id:135,h:"忘",p:"wàng",e:"to forget",g:"ch12d2"},{id:136,h:"带",p:"dài",e:"to bring, to carry",g:"ch12d2"},{id:137,h:"饭卡",p:"fànkǎ",e:"meal card",g:"ch12d2"},{id:138,h:"错",p:"cuò",e:"wrong",g:"ch12d2"},{id:118,h:"清楚",p:"qīngchu",e:"clear",g:"ch12d2"},{id:119,h:"没关系",p:"méi guānxi",e:"it doesn't matter",g:"ch12d2"},{id:204,h:"上海",p:"Shànghǎi",e:"Shanghai",g:"ch12d2"},
+// Ch13 D1
+{id:104,h:"上",p:"shàng",e:"to go (colloq.)",g:"ch13d1"},{id:105,h:"中心",p:"zhōngxīn",e:"center",g:"ch13d1"},{id:106,h:"听说",p:"tīngshuō",e:"to hear of",g:"ch13d1"},{id:107,h:"运动",p:"yùndòng",e:"sports",g:"ch13d1"},{id:108,h:"场",p:"chǎng",e:"field",g:"ch13d1"},{id:109,h:"旁边",p:"pángbiān",e:"side",g:"ch13d1"},{id:110,h:"远",p:"yuǎn",e:"far",g:"ch13d1"},{id:111,h:"离",p:"lí",e:"away from",g:"ch13d1"},{id:112,h:"近",p:"jìn",e:"near",g:"ch13d1"},{id:113,h:"活动",p:"huódòng",e:"activity",g:"ch13d1"},{id:114,h:"中间",p:"zhōngjiān",e:"middle",g:"ch13d1"},{id:115,h:"书店",p:"shūdiàn",e:"bookstore",g:"ch13d1"},{id:116,h:"地方",p:"dìfang",e:"place",g:"ch13d1"},{id:117,h:"里边",p:"lǐbian",e:"inside",g:"ch13d1"},
+// Ch13 D2
+{id:83,h:"中国城",p:"Zhōngguóchéng",e:"Chinatown",g:"ch13d2"},{id:84,h:"城",p:"chéng",e:"town, city",g:"ch13d2"},{id:85,h:"地图",p:"dìtú",e:"map",g:"ch13d2"},{id:86,h:"拿",p:"ná",e:"to take, to get",g:"ch13d2"},{id:87,h:"次",p:"cì",e:"(measure word for frequency)",g:"ch13d2"},{id:88,h:"从",p:"cóng",e:"from",g:"ch13d2"},{id:89,h:"一直",p:"yìzhí",e:"straight, continuously",g:"ch13d2"},{id:90,h:"往",p:"wǎng",e:"towards",g:"ch13d2"},{id:91,h:"南",p:"nán",e:"south",g:"ch13d2"},{id:92,h:"路口",p:"lùkǒu",e:"intersection",g:"ch13d2"},{id:93,h:"西",p:"xī",e:"west",g:"ch13d2"},{id:94,h:"拐",p:"guǎi",e:"to turn",g:"ch13d2"},{id:95,h:"哎",p:"āi",e:"(exclamation)",g:"ch13d2"},{id:96,h:"东",p:"dōng",e:"east",g:"ch13d2"},{id:97,h:"北",p:"běi",e:"north",g:"ch13d2"},{id:98,h:"前",p:"qián",e:"forward, ahead",g:"ch13d2"},{id:99,h:"红绿灯",p:"hónglǜdēng",e:"traffic light",g:"ch13d2"},{id:100,h:"灯",p:"dēng",e:"light",g:"ch13d2"},{id:101,h:"右",p:"yòu",e:"right",g:"ch13d2"},{id:102,h:"左",p:"zuǒ",e:"left",g:"ch13d2"},{id:103,h:"前面",p:"qiánmiàn",e:"ahead, in front of",g:"ch13d2"},{id:205,h:"谷歌",p:"Gǔgē",e:"Google",g:"ch13d2"},{id:206,h:"日文",p:"Rìwén",e:"Japanese (language)",g:"ch13d2"},{id:207,h:"东京",p:"Dōngjīng",e:"Tokyo",g:"ch13d2"},{id:208,h:"日本",p:"Rìběn",e:"Japan",g:"ch13d2"},
+// Ch14 D1
+{id:65,h:"过",p:"guò",e:"to celebrate; to live (a life)",g:"ch14d1"},{id:66,h:"舞会",p:"wǔhuì",e:"dance party, ball",g:"ch14d1"},{id:67,h:"表姐",p:"biǎojiě",e:"older female cousin",g:"ch14d1"},{id:68,h:"中学",p:"zhōngxué",e:"middle school",g:"ch14d1"},{id:69,h:"送",p:"sòng",e:"to give as a gift",g:"ch14d1"},{id:70,h:"礼物",p:"lǐwù",e:"gift, present",g:"ch14d1"},{id:71,h:"本",p:"běn",e:"(measure word for books)",g:"ch14d1"},{id:72,h:"饮料",p:"yǐnliào",e:"beverage",g:"ch14d1"},{id:73,h:"水果",p:"shuǐguǒ",e:"fruit",g:"ch14d1"},{id:74,h:"花",p:"huā",e:"flower",g:"ch14d1"},{id:75,h:"爱",p:"ài",e:"to love, to like",g:"ch14d1"},{id:76,h:"苹果",p:"píngguǒ",e:"apple",g:"ch14d1"},{id:77,h:"梨",p:"lí",e:"pear",g:"ch14d1"},{id:78,h:"西瓜",p:"xīgua",e:"watermelon",g:"ch14d1"},{id:79,h:"住",p:"zhù",e:"to live (in a place)",g:"ch14d1"},{id:80,h:"重",p:"zhòng",e:"heavy, serious",g:"ch14d1"},{id:81,h:"接",p:"jiē",e:"to catch, to meet",g:"ch14d1"},{id:82,h:"楼",p:"lóu",e:"building, floor",g:"ch14d1"},{id:200,h:"王红",p:"Wáng Hóng",e:"(a personal name)",g:"ch14d1"},
+// Ch14 D2
+{id:44,h:"钟头",p:"zhōngtóu",e:"hour",g:"ch14d2"},{id:45,h:"以为",p:"yǐwéi",e:"to assume erroneously",g:"ch14d2"},{id:46,h:"聪明",p:"cōngming",e:"smart, clever",g:"ch14d2"},{id:47,h:"用功",p:"yònggōng",e:"hardworking, diligent",g:"ch14d2"},{id:48,h:"暑期",p:"shǔqī",e:"summer term",g:"ch14d2"},{id:49,h:"班",p:"bān",e:"class",g:"ch14d2"},{id:50,h:"长",p:"zhǎng",e:"to grow, to appear",g:"ch14d2"},{id:51,h:"可爱",p:"kě'ài",e:"cute, lovable",g:"ch14d2"},{id:52,h:"去年",p:"qùnián",e:"last year",g:"ch14d2"},{id:53,h:"属",p:"shǔ",e:"to belong to",g:"ch14d2"},{id:54,h:"狗",p:"gǒu",e:"dog",g:"ch14d2"},{id:55,h:"脸",p:"liǎn",e:"face",g:"ch14d2"},{id:56,h:"圆",p:"yuán",e:"round",g:"ch14d2"},{id:57,h:"眼睛",p:"yǎnjing",e:"eye",g:"ch14d2"},{id:58,h:"鼻子",p:"bízi",e:"nose",g:"ch14d2"},{id:59,h:"嘴",p:"zuǐ",e:"mouth",g:"ch14d2"},{id:60,h:"像",p:"xiàng",e:"to be like",g:"ch14d2"},{id:61,h:"长大",p:"zhǎng dà",e:"to grow up",g:"ch14d2"},{id:62,h:"一定",p:"yídìng",e:"certainly, definitely",g:"ch14d2"},{id:63,h:"蛋糕",p:"dàngāo",e:"cake",g:"ch14d2"},{id:64,h:"最",p:"zuì",e:"most, -est",g:"ch14d2"},{id:201,h:"海伦",p:"Hǎilún",e:"Helen",g:"ch14d2"},{id:202,h:"汤姆",p:"Tāngmǔ",e:"Tom",g:"ch14d2"},
+// Ch15 D1
+{id:23,h:"病人",p:"bìngrén",e:"patient",g:"ch15d1"},{id:24,h:"病",p:"bìng",e:"illness; to get sick",g:"ch15d1"},{id:25,h:"医院",p:"yīyuàn",e:"hospital",g:"ch15d1"},{id:26,h:"看病",p:"kàn bìng",e:"to see a doctor",g:"ch15d1"},{id:27,h:"肚子",p:"dùzi",e:"belly, stomach",g:"ch15d1"},{id:28,h:"疼死",p:"téng sǐ",e:"really painful",g:"ch15d1"},{id:29,h:"疼",p:"téng",e:"aching",g:"ch15d1"},{id:30,h:"死",p:"sǐ",e:"to die; (extreme degree)",g:"ch15d1"},{id:31,h:"夜里",p:"yè li",e:"at night",g:"ch15d1"},{id:32,h:"好几",p:"hǎo jǐ",e:"quite a few",g:"ch15d1"},{id:33,h:"厕所",p:"cèsuǒ",e:"restroom, toilet",g:"ch15d1"},{id:34,h:"把",p:"bǎ",e:"(disposition particle)",g:"ch15d1"},{id:35,h:"冰箱",p:"bīngxiāng",e:"refrigerator",g:"ch15d1"},{id:36,h:"发烧",p:"fā shāo",e:"to have a fever",g:"ch15d1"},{id:37,h:"躺下",p:"tǎng xia",e:"to lie down",g:"ch15d1"},{id:38,h:"躺",p:"tǎng",e:"to lie, to recline",g:"ch15d1"},{id:39,h:"检查",p:"jiǎnchá",e:"to examine",g:"ch15d1"},{id:40,h:"吃坏",p:"chī huài",e:"to get sick from bad food",g:"ch15d1"},{id:41,h:"坏",p:"huài",e:"bad",g:"ch15d1"},{id:42,h:"打针",p:"dǎ zhēn",e:"to get an injection",g:"ch15d1"},{id:43,h:"针",p:"zhēn",e:"needle",g:"ch15d1"},{id:17,h:"药",p:"yào",e:"medicine",g:"ch15d1"},{id:18,h:"片",p:"piàn",e:"(measure word for tablets)",g:"ch15d1"},{id:19,h:"遍",p:"biàn",e:"(measure word for actions)",g:"ch15d1"},{id:20,h:"最好",p:"zuìhǎo",e:"had better",g:"ch15d1"},{id:21,h:"小时",p:"xiǎoshí",e:"hour",g:"ch15d1"},{id:22,h:"办法",p:"bànfǎ",e:"method, way",g:"ch15d1"},
+// Ch15 D2
+{id:1,h:"生病",p:"shēng bìng",e:"to get sick",g:"ch15d2"},{id:2,h:"感冒",p:"gǎnmào",e:"to have a cold",g:"ch15d2"},{id:3,h:"身体",p:"shēntǐ",e:"body, health",g:"ch15d2"},{id:4,h:"痒",p:"yǎng",e:"itchy",g:"ch15d2"},{id:5,h:"过敏",p:"guòmǐn",e:"to be allergic to",g:"ch15d2"},{id:6,h:"药店",p:"yàodiàn",e:"pharmacy",g:"ch15d2"},{id:7,h:"健康",p:"jiànkāng",e:"healthy; health",g:"ch15d2"},{id:8,h:"保险",p:"bǎoxiǎn",e:"insurance; secure",g:"ch15d2"},{id:9,h:"赶快",p:"gǎnkuài",e:"right away, quickly",g:"ch15d2"},{id:10,h:"要不然",p:"yàobùrán",e:"otherwise",g:"ch15d2"},{id:11,h:"越来越",p:"yuè lái yuè",e:"more and more",g:"ch15d2"},{id:12,h:"上次",p:"shàng cì",e:"last time",g:"ch15d2"},{id:13,h:"休息",p:"xiūxi",e:"to rest",g:"ch15d2"},{id:14,h:"懒",p:"lǎn",e:"lazy",g:"ch15d2"},{id:15,h:"再说",p:"zàishuō",e:"moreover",g:"ch15d2"},{id:16,h:"乱",p:"luàn",e:"randomly, messily",g:"ch15d2"},
+// Ch16 D1 — Dating
+{id:300,h:"同",p:"tóng",e:"same",g:"ch16d1"},{id:301,h:"印象",p:"yìnxiàng",e:"impression",g:"ch16d1"},{id:302,h:"成",p:"chéng",e:"to become",g:"ch16d1"},{id:303,h:"演",p:"yǎn",e:"to show (a film), to perform",g:"ch16d1"},{id:304,h:"费",p:"fèi",e:"to spend, to take (effort)",g:"ch16d1"},{id:305,h:"力气",p:"lìqi",e:"strength, effort",g:"ch16d1"},{id:306,h:"就",p:"jiù",e:"just, only (indicating a small number)",g:"ch16d1"},{id:307,h:"俩",p:"liǎ",e:"(coll.) two",g:"ch16d1"},{id:308,h:"后天",p:"hòutiān",e:"the day after tomorrow",g:"ch16d1"},{id:309,h:"一言为定",p:"yì yán wéi dìng",e:"that settles it, it's a deal",g:"ch16d1"},
+// Ch16 D2 — Dating
+{id:310,h:"记得",p:"jìde",e:"to remember",g:"ch16d2"},{id:311,h:"记",p:"jì",e:"to record",g:"ch16d2"},{id:312,h:"想",p:"xiǎng",e:"to think",g:"ch16d2"},{id:313,h:"想起来",p:"xiǎng qi lai",e:"to remember, to recall",g:"ch16d2"},{id:314,h:"号码",p:"hàomǎ",e:"number",g:"ch16d2"},{id:315,h:"搬",p:"bān",e:"to move",g:"ch16d2"},{id:316,h:"打扫",p:"dǎsǎo",e:"to clean up (a room)",g:"ch16d2"},{id:317,h:"扫",p:"sǎo",e:"to sweep",g:"ch16d2"},{id:318,h:"整理",p:"zhěnglǐ",e:"to put in order",g:"ch16d2"},{id:319,h:"房间",p:"fángjiān",e:"room",g:"ch16d2"},{id:320,h:"旅行",p:"lǚxíng",e:"to travel",g:"ch16d2"},{id:321,h:"电",p:"diàn",e:"electricity",g:"ch16d2"},
+// Ch17 D1 — Renting an Apartment
+{id:330,h:"吵",p:"chǎo",e:"to quarrel; noisy",g:"ch17d1"},{id:331,h:"连",p:"lián",e:"even",g:"ch17d1"},{id:332,h:"做饭",p:"zuò fàn",e:"to cook, to prepare a meal",g:"ch17d1"},{id:333,h:"报纸",p:"bàozhǐ",e:"newspaper",g:"ch17d1"},{id:334,h:"广告",p:"guǎnggào",e:"advertisement",g:"ch17d1"},{id:335,h:"附近",p:"fùjìn",e:"vicinity, nearby area",g:"ch17d1"},{id:336,h:"套",p:"tào",e:"(measure word for sets)",g:"ch17d1"},{id:337,h:"公寓",p:"gōngyù",e:"apartment",g:"ch17d1"},{id:338,h:"出租",p:"chūzū",e:"to rent out",g:"ch17d1"},{id:339,h:"走路",p:"zǒu lù",e:"to walk",g:"ch17d1"},{id:340,h:"分钟",p:"fēnzhōng",e:"minute",g:"ch17d1"},{id:341,h:"卧室",p:"wòshì",e:"bedroom",g:"ch17d1"},{id:342,h:"厨房",p:"chúfáng",e:"kitchen",g:"ch17d1"},{id:343,h:"卫生间",p:"wèishēngjiān",e:"bathroom",g:"ch17d1"},{id:344,h:"客厅",p:"kètīng",e:"living room",g:"ch17d1"},{id:345,h:"家具",p:"jiājù",e:"furniture",g:"ch17d1"},{id:346,h:"可能",p:"kěnéng",e:"may; possible",g:"ch17d1"},
+// Ch17 D2 — Renting an Apartment
+{id:350,h:"一房一厅",p:"yì fáng yì tīng",e:"one bedroom and one living room",g:"ch17d2"},{id:351,h:"干净",p:"gānjìng",e:"clean",g:"ch17d2"},{id:352,h:"沙发",p:"shāfā",e:"sofa",g:"ch17d2"},{id:353,h:"饭桌",p:"fànzhuō",e:"dining table",g:"ch17d2"},{id:354,h:"椅子",p:"yǐzi",e:"chair",g:"ch17d2"},{id:355,h:"书桌",p:"shūzhuō",e:"desk",g:"ch17d2"},{id:356,h:"书架",p:"shūjià",e:"bookcase, bookshelf",g:"ch17d2"},{id:357,h:"那里",p:"nàli",e:"there",g:"ch17d2"},{id:358,h:"安静",p:"ānjìng",e:"quiet",g:"ch17d2"},{id:359,h:"房租",p:"fángzū",e:"rent",g:"ch17d2"},{id:360,h:"元",p:"yuán",e:"yuan (currency unit)",g:"ch17d2"},{id:361,h:"美元",p:"Měiyuán",e:"American dollar (USD)",g:"ch17d2"},{id:362,h:"人民币",p:"Rénmínbì",e:"renminbi (RMB)",g:"ch17d2"},{id:363,h:"人民",p:"rénmín",e:"the people",g:"ch17d2"},{id:364,h:"币",p:"bì",e:"currency",g:"ch17d2"},{id:365,h:"差不多",p:"chàbuduō",e:"almost, nearly; similar",g:"ch17d2"},{id:366,h:"费",p:"fèi",e:"fee, expenses",g:"ch17d2"},{id:367,h:"押金",p:"yājīn",e:"security deposit",g:"ch17d2"},{id:368,h:"当",p:"dāng",e:"to serve as, to be",g:"ch17d2"},{id:369,h:"还",p:"huán",e:"to return (something)",g:"ch17d2"},{id:370,h:"另外",p:"lìngwài",e:"furthermore, in addition",g:"ch17d2"},{id:371,h:"准",p:"zhǔn",e:"to allow, to be allowed",g:"ch17d2"},{id:372,h:"养",p:"yǎng",e:"to raise",g:"ch17d2"},{id:373,h:"宠物",p:"chǒngwù",e:"pet",g:"ch17d2"},{id:374,h:"兴趣",p:"xìngqù",e:"interest",g:"ch17d2"},
+// Ch18 D1 — Sports
+{id:380,h:"当然",p:"dāngrán",e:"of course",g:"ch18d1"},{id:381,h:"胖",p:"pàng",e:"fat",g:"ch18d1"},{id:382,h:"怕",p:"pà",e:"to fear, to be afraid of",g:"ch18d1"},{id:383,h:"简单",p:"jiǎndān",e:"simple",g:"ch18d1"},{id:384,h:"跑步",p:"pǎo bù",e:"to jog",g:"ch18d1"},{id:385,h:"跑",p:"pǎo",e:"to run",g:"ch18d1"},{id:386,h:"难受",p:"nánshòu",e:"hard to bear, uncomfortable",g:"ch18d1"},{id:387,h:"网球",p:"wǎngqiú",e:"tennis",g:"ch18d1"},{id:388,h:"拍",p:"pāi",e:"racket",g:"ch18d1"},{id:389,h:"篮球",p:"lánqiú",e:"basketball",g:"ch18d1"},{id:390,h:"游泳",p:"yóu yǒng",e:"to swim",g:"ch18d1"},{id:391,h:"危险",p:"wēixiǎn",e:"dangerous",g:"ch18d1"},{id:392,h:"淹死",p:"yān sǐ",e:"to drown",g:"ch18d1"},{id:393,h:"愿意",p:"yuànyì",e:"to be willing",g:"ch18d1"},
+// Ch18 D2 — Sports
+{id:400,h:"上大学",p:"shàng dàxué",e:"to attend college/university",g:"ch18d2"},{id:401,h:"为了",p:"wèile",e:"for the sake of",g:"ch18d2"},{id:402,h:"提高",p:"tígāo",e:"to improve, to raise",g:"ch18d2"},{id:403,h:"水平",p:"shuǐpíng",e:"level, standard",g:"ch18d2"},{id:404,h:"足球",p:"zúqiú",e:"soccer, football",g:"ch18d2"},{id:405,h:"比赛",p:"bǐsài",e:"game, match, competition",g:"ch18d2"},{id:406,h:"国际",p:"guójì",e:"international",g:"ch18d2"},{id:407,h:"美式",p:"Měishì",e:"American-style",g:"ch18d2"},{id:408,h:"应该",p:"yīnggāi",e:"should, ought to",g:"ch18d2"},{id:409,h:"脚",p:"jiǎo",e:"foot",g:"ch18d2"},{id:410,h:"踢",p:"tī",e:"to kick",g:"ch18d2"},{id:411,h:"手",p:"shǒu",e:"hand",g:"ch18d2"},{id:412,h:"抱",p:"bào",e:"to hold or carry in the arms",g:"ch18d2"},{id:413,h:"压",p:"yā",e:"to press, to hold down",g:"ch18d2"},{id:414,h:"被",p:"bèi",e:"by (passive marker)",g:"ch18d2"},{id:415,h:"担心",p:"dān xīn",e:"to worry",g:"ch18d2"},{id:416,h:"棒",p:"bàng",e:"fantastic, super",g:"ch18d2"},{id:417,h:"运动服",p:"yùndòngfú",e:"sportswear, athletic clothing",g:"ch18d2"},{id:418,h:"半天",p:"bàntiān",e:"half a day, a long time",g:"ch18d2"},
+// Ch19 D1 — Travel
+{id:420,h:"马上",p:"mǎshàng",e:"immediately, right away",g:"ch19d1"},{id:421,h:"放假",p:"fàng jià",e:"go on vacation, have time off",g:"ch19d1"},{id:422,h:"放",p:"fàng",e:"to let go, to set free",g:"ch19d1"},{id:423,h:"假",p:"jià",e:"vacation, holiday",g:"ch19d1"},{id:424,h:"公司",p:"gōngsī",e:"company",g:"ch19d1"},{id:425,h:"实习",p:"shíxí",e:"to intern",g:"ch19d1"},{id:426,h:"打工",p:"dǎ gōng",e:"to work at a temporary job",g:"ch19d1"},{id:427,h:"计划",p:"jìhuà",e:"plan; to plan",g:"ch19d1"},{id:428,h:"暑假",p:"shǔjià",e:"summer vacation",g:"ch19d1"},{id:429,h:"打算",p:"dǎsuàn",e:"to plan; plan",g:"ch19d1"},{id:430,h:"父母",p:"fùmǔ",e:"parents",g:"ch19d1"},{id:431,h:"首都",p:"shǒudū",e:"capital city",g:"ch19d1"},{id:432,h:"政治",p:"zhèngzhì",e:"politics",g:"ch19d1"},{id:433,h:"文化",p:"wénhuà",e:"culture",g:"ch19d1"},{id:434,h:"名胜古迹",p:"míngshèng gǔjì",e:"famous scenic spots and historic sites",g:"ch19d1"},{id:435,h:"有名",p:"yǒumíng",e:"famous, well-known",g:"ch19d1"},{id:436,h:"导游",p:"dǎoyóu",e:"tour guide",g:"ch19d1"},{id:437,h:"护照",p:"hùzhào",e:"passport",g:"ch19d1"},{id:438,h:"签证",p:"qiānzhèng",e:"visa",g:"ch19d1"},{id:439,h:"旅行社",p:"lǚxíngshè",e:"travel agency",g:"ch19d1"},{id:440,h:"订",p:"dìng",e:"to reserve, to book",g:"ch19d1"},{id:441,h:"长城",p:"Chángchéng",e:"the Great Wall",g:"ch19d1"},{id:442,h:"香港",p:"Xiānggǎng",e:"Hong Kong",g:"ch19d1"},{id:443,h:"台北",p:"Táiběi",e:"Taipei",g:"ch19d1"},
+// Ch19 D2 — Travel
+{id:450,h:"初",p:"chū",e:"beginning",g:"ch19d2"},{id:451,h:"单程",p:"dānchéng",e:"one-way trip",g:"ch19d2"},{id:452,h:"往返",p:"wǎngfǎn",e:"make a round trip",g:"ch19d2"},{id:453,h:"航空",p:"hángkōng",e:"aviation",g:"ch19d2"},{id:454,h:"查",p:"chá",e:"to check, to look into",g:"ch19d2"},{id:455,h:"航班",p:"hángbān",e:"scheduled flight",g:"ch19d2"},{id:456,h:"千",p:"qiān",e:"thousand",g:"ch19d2"},{id:457,h:"直飞",p:"zhí fēi",e:"fly directly",g:"ch19d2"},{id:458,h:"打折",p:"dǎ zhé",e:"to sell at a discount",g:"ch19d2"},{id:459,h:"转机",p:"zhuǎn jī",e:"change planes",g:"ch19d2"},{id:460,h:"靠",p:"kào",e:"to lean on, to be next to",g:"ch19d2"},{id:461,h:"窗户",p:"chuānghu",e:"window",g:"ch19d2"},{id:462,h:"走道",p:"zǒudào",e:"aisle",g:"ch19d2"},{id:463,h:"份",p:"fèn",e:"(measure word for meal orders, jobs)",g:"ch19d2"},{id:464,h:"素餐",p:"sùcān",e:"vegetarian meal",g:"ch19d2"},{id:465,h:"旅馆",p:"lǚguǎn",e:"hotel",g:"ch19d2"},{id:466,h:"租",p:"zū",e:"to rent",g:"ch19d2"},{id:467,h:"中国国际航空公司",p:"Zhōngguó Guójì Hángkōng Gōngsī",e:"Air China",g:"ch19d2"},{id:468,h:"西北航空公司",p:"Xīběi Hángkōng Gōngsī",e:"Northwest Airlines",g:"ch19d2"},
+// Ch20 D1 — At the Airport
+{id:470,h:"行李",p:"xíngli",e:"luggage",g:"ch20d1"},{id:471,h:"托运",p:"tuōyùn",e:"to check (luggage)",g:"ch20d1"},{id:472,h:"包",p:"bāo",e:"bag, sack, bundle, package",g:"ch20d1"},{id:473,h:"箱子",p:"xiāngzi",e:"suitcase, box",g:"ch20d1"},{id:474,h:"超重",p:"chāozhòng",e:"to be overweight (freight)",g:"ch20d1"},{id:475,h:"超",p:"chāo",e:"to exceed, to surpass",g:"ch20d1"},{id:476,h:"登机牌",p:"dēngjīpái",e:"boarding pass",g:"ch20d1"},{id:477,h:"牌",p:"pái",e:"plate, tablet, card",g:"ch20d1"},{id:478,h:"登机口",p:"dēngjīkǒu",e:"boarding gate",g:"ch20d1"},{id:479,h:"口",p:"kǒu",e:"opening, entrance, mouth",g:"ch20d1"},{id:480,h:"哭",p:"kū",e:"to cry, to weep",g:"ch20d1"},{id:481,h:"地",p:"de",e:"(particle to link adverbial and verb)",g:"ch20d1"},{id:482,h:"照顾",p:"zhàogu",e:"to look after, to care for",g:"ch20d1"},{id:483,h:"起飞",p:"qǐfēi",e:"(of airplanes) to take off",g:"ch20d1"},{id:484,h:"小心",p:"xiǎoxīn",e:"to be careful",g:"ch20d1"},{id:485,h:"一路平安",p:"yí lù píng'ān",e:"have a good trip, bon voyage",g:"ch20d1"},
+// Ch20 D2 — At the Airport
+{id:490,h:"叔叔",p:"shūshu",e:"uncle",g:"ch20d2"},{id:491,h:"阿姨",p:"āyí",e:"aunt",g:"ch20d2"},{id:492,h:"欢迎",p:"huānyíng",e:"to welcome",g:"ch20d2"},{id:493,h:"瘦",p:"shòu",e:"thin, skinny, lean",g:"ch20d2"},{id:494,h:"爷爷",p:"yéye",e:"paternal grandfather",g:"ch20d2"},{id:495,h:"奶奶",p:"nǎinai",e:"paternal grandmother",g:"ch20d2"},{id:496,h:"烤鸭",p:"kǎoyā",e:"roast duck",g:"ch20d2"},{id:497,h:"首都机场",p:"Shǒudū Jīchǎng",e:"the Capital Airport (in Beijing)",g:"ch20d2"},
 ];
 
-const CATEGORIES = ["all","health & illness","seeing a doctor","appearance","celebrations","directions","campus & places","food & cooking","restaurant","weather & seasons"];
-const CATEGORY_ICONS = {"health & illness":"🏥","seeing a doctor":"👨‍⚕️","appearance":"👤","celebrations":"🎉","directions":"🧭","campus & places":"🏫","food & cooking":"🍳","restaurant":"🍜","weather & seasons":"🌤️"};
+const DL=[...BOOK1_DIALOGUES,{key:"ch11d1",ch:11,d:1,t:"Weather",bk:2},{key:"ch11d2",ch:11,d:2,t:"Weather",bk:2},{key:"ch12d1",ch:12,d:1,t:"Dining",bk:2},{key:"ch12d2",ch:12,d:2,t:"Dining",bk:2},{key:"ch13d1",ch:13,d:1,t:"Asking Directions",bk:2},{key:"ch13d2",ch:13,d:2,t:"Asking Directions",bk:2},{key:"ch14d1",ch:14,d:1,t:"Birthday Party",bk:2},{key:"ch14d2",ch:14,d:2,t:"Birthday Party",bk:2},{key:"ch15d1",ch:15,d:1,t:"Seeing a Doctor",bk:2},{key:"ch15d2",ch:15,d:2,t:"Seeing a Doctor",bk:2},{key:"ch16d1",ch:16,d:1,t:"Dating",bk:2},{key:"ch16d2",ch:16,d:2,t:"Dating",bk:2},{key:"ch17d1",ch:17,d:1,t:"Renting an Apartment",bk:2},{key:"ch17d2",ch:17,d:2,t:"Renting an Apartment",bk:2},{key:"ch18d1",ch:18,d:1,t:"Sports",bk:2},{key:"ch18d2",ch:18,d:2,t:"Sports",bk:2},{key:"ch19d1",ch:19,d:1,t:"Travel",bk:2},{key:"ch19d2",ch:19,d:2,t:"Travel",bk:2},{key:"ch20d1",ch:20,d:1,t:"At the Airport",bk:2},{key:"ch20d2",ch:20,d:2,t:"At the Airport",bk:2}];
 
-function initSRS(words) {
-  return words.map(w => ({ ...w, interval: 0, repetitions: 0, easeFactor: 2.5, nextReview: Date.now(), lastReviewed: null, correctCount: 0, incorrectCount: 0 }));
+const BOOKS=[{n:1,label:"Book 1",chs:[1,2,3,4,5,6,7,8,9,10]},{n:2,label:"Book 2",chs:[11,12,13,14,15,16,17,18,19,20]},{n:3,label:"Book 3",chs:[],soon:true},{n:4,label:"Book 4",chs:[],soon:true}];
+const CH_T={...BOOK1_CH_TITLES,11:"Weather",12:"Dining",13:"Asking Directions",14:"Birthday Party",15:"Seeing a Doctor",16:"Dating",17:"Renting an Apartment",18:"Sports",19:"Travel",20:"At the Airport"};
+
+const SD=[0,1,3,7,14,30,60],SL=["New","1d","3d","1w","2w","1m","Mastered"],SC=["#94a3b8","#f97316","#eab308","#22c55e","#14b8a6","#6366f1","#8b5cf6"],DAY=864e5;
+const gs=r=>Math.min(r,6),gd=c=>{const eod=startOfDay(Date.now())+DAY;return c.filter(x=>x.nr<eod).sort((a,b)=>a.nr-b.nr);};
+const fm=(i,t)=>{const a=i.trim().toLowerCase().replace(/[^a-z0-9\s]/g,""),b=t.trim().toLowerCase().replace(/[^a-z0-9\s]/g,"");if(a===b)return"exact";if(b.split(/[,;/]/).some(p=>p.trim()===a))return"exact";if((b.includes(a)||b.split(/[,;/]/).some(p=>p.trim().startsWith(a)))&&a.length>=2)return"partial";return"wrong";};
+const ic=w=>({...w,rep:0,ef:2.5,nr:Date.now(),lr:null,cc:0,ic:0});
+const td=()=>new Date().toISOString().slice(0,10);
+const startOfDay=d=>{const t=new Date(d);t.setHours(0,0,0,0);return t.getTime();};
+const dueIn=days=>days===0?Date.now()+3e5:startOfDay(Date.now())+days*DAY;
+const MAX_FIELD=200,MAX_CSV_ROWS=500,MAX_CSV_FILE=512*1024;
+const san=s=>typeof s==="string"?s.slice(0,MAX_FIELD):"";
+const valSrs=c=>({id:Number(c.id)||0,rep:Math.max(0,Math.min(6,Math.floor(Number(c.rep)||0))),ef:Number(c.ef)||2.5,nr:typeof c.nr==="number"&&c.nr>0?c.nr:Date.now(),lr:typeof c.lr==="number"&&c.lr>0?c.lr:null,cc:Math.max(0,Math.floor(Number(c.cc)||0)),ic:Math.max(0,Math.floor(Number(c.ic)||0))});
+async function sv(uid,d){try{const safe={imported:(d.imported||[]).filter(k=>typeof k==="string").map(san),srs:(d.srs||[]).map(valSrs),classWords:(d.classWords||[]).map(c=>({id:Number(c.id)||0,h:san(c.h),p:san(c.p),e:san(c.e),g:san(c.g)})),streak:{count:Math.max(0,Math.floor(Number(d.streak?.count)||0)),last:typeof d.streak?.last==="string"?d.streak.last.slice(0,10):null},dailyReviews:{date:typeof d.dailyReviews?.date==="string"?d.dailyReviews.date.slice(0,10):null,count:Math.max(0,Math.floor(Number(d.dailyReviews?.count)||0))},updatedAt:Date.now()};await setDoc(doc(db,"users",uid),safe);}catch(e){console.error(e);}}
+async function ld(uid){try{const s=await getDoc(doc(db,"users",uid));if(s.exists())return s.data();}catch(e){console.error(e);}return null;}
+
+function Fold({label,badge,children,defaultOpen=false}){
+  const[o,sO]=useState(defaultOpen);
+  return<div style={{marginBottom:1}}><button onClick={()=>sO(!o)} style={{display:"flex",alignItems:"center",width:"100%",padding:"10px 12px",background:"none",border:"none",cursor:"pointer",fontFamily:"inherit",fontSize:13,fontWeight:600,color:"#2d3748",gap:8}}><span style={{fontSize:10,color:"#a0aec0",transition:"transform .2s",transform:o?"rotate(90deg)":"rotate(0deg)"}}>▶</span><span style={{flex:1,textAlign:"left"}}>{label}</span>{badge!==undefined&&<span style={{fontSize:10,color:"#94a3b8",fontWeight:400}}>{badge}</span>}</button>{o&&<div style={{paddingLeft:12}}>{children}</div>}</div>;
 }
 
-function sm2(card, quality) {
-  let { interval, repetitions, easeFactor } = card;
-  if (quality >= 3) {
-    if (repetitions === 0) interval = 1;
-    else if (repetitions === 1) interval = 6;
-    else interval = Math.round(interval * easeFactor);
-    repetitions += 1;
-  } else { repetitions = 0; interval = 0; }
-  easeFactor = Math.max(1.3, easeFactor + (0.1 - (5 - quality) * (0.08 + (5 - quality) * 0.02)));
-  return { interval, repetitions, easeFactor, nextReview: Date.now() + interval * 60 * 1000 };
-}
+export default function App(){
+  const[user,setUser]=useState(null);const[aL,setAL]=useState(true);
+  const[imp,setImp]=useState([]);const[cards,setCards]=useState([]);const[cw,setCw]=useState([]);
+  const[streak,setStreak]=useState({count:0,last:null});const[dRev,setDRev]=useState({date:null,count:0});const[cloudOk,setCloudOk]=useState(false);const[saving,setSaving]=useState(false);
+  const[vw,setVw]=useState("home");const[cur,setCur]=useState(null);const[fl,setFl]=useState(false);const[ft,setFt]=useState("all");
+  const[st,setSt]=useState({r:0,c:0});const[sp,setSp]=useState(false);const[an,setAn]=useState("");const[sr,setSr]=useState("");const[expWord,setExpWord]=useState(null);const[editW,setEditW]=useState({h:"",p:"",e:""});const[editStg,setEditStg]=useState(null);const[qd,setQd]=useState("py");const[showSett,setShowSett]=useState(false);const[csvPv,setCsvPv]=useState(null);
+  const[mc,setMc]=useState(20);const[qu,setQu]=useState([]);const[md,setMd]=useState("flashcard");
+  const[ty,setTy]=useState("");const[tr2,setTr2]=useState(null);const[nw,setNw]=useState({h:"",p:"",e:""});const rf=useRef(null);const loadedRef=useRef(false);const prevDataRef=useRef(null);const hadDataRef=useRef(false);
 
-function getDueCards(cards) {
-  return cards.filter(c => c.nextReview <= Date.now()).sort((a, b) => a.nextReview - b.nextReview);
-}
+  useEffect(()=>{const u=onAuthStateChanged(auth,u=>{setUser(u);setAL(false);});return u;},[]);
+  const restoreFromData=(data)=>{const il=data.imported||[];setImp(il);const sm={};(data.srs||[]).forEach(s=>{sm[s.id]=s;});setCards(AW.filter(w=>il.includes(w.g)).map(w=>{const s=sm[w.id];return s?{...w,...s}:ic(w);}));setCw((data.classWords||[]).map(w=>{const s=sm[w.id];return s?{...w,...s}:w;}));setStreak(data.streak||{count:0,last:null});setDRev(data.dailyReviews||{date:null,count:0});};
+  useEffect(()=>{if(!user){setCloudOk(false);loadedRef.current=false;return;}ld(user.uid).then(data=>{const hasData=data&&((data.srs||[]).length>0||(data.imported||[]).length>0);if(hasData){prevDataRef.current=data;hadDataRef.current=true;restoreFromData(data);try{localStorage.setItem("shifu_backup_"+user.uid,JSON.stringify(data));}catch(e){}}else{let backup=null;try{const raw=localStorage.getItem("shifu_backup_"+user.uid);if(raw)backup=JSON.parse(raw);}catch(e){}const backupHasData=backup&&((backup.srs||[]).length>0||(backup.imported||[]).length>0);if(backupHasData){prevDataRef.current=backup;hadDataRef.current=true;restoreFromData(backup);console.warn("Restored from local backup — cloud was empty");}else{hadDataRef.current=false;}}loadedRef.current=true;setCloudOk(true);});},[user]);
+  useEffect(()=>{if(!user||!cloudOk||!loadedRef.current)return;const newSrsCount=[...cards,...cw].length;const newImpCount=imp.length;if(hadDataRef.current&&newSrsCount===0&&newImpCount===0){console.error("Save blocked: would erase all data (had data before)");return;}setSaving(true);const t=setTimeout(()=>{const srs=[...cards,...cw].map(c=>({id:c.id,rep:c.rep,ef:c.ef,nr:c.nr,lr:c.lr,cc:c.cc,ic:c.ic}));const payload={imported:imp,srs,classWords:cw.map(c=>({id:c.id,h:c.h,p:c.p,e:c.e,g:c.g})),streak,dailyReviews:dRev};prevDataRef.current=payload;hadDataRef.current=srs.length>0||imp.length>0;sv(user.uid,payload).then(()=>setSaving(false));try{localStorage.setItem("shifu_backup_"+user.uid,JSON.stringify(payload));}catch(e){}},2000);return()=>clearTimeout(t);},[cards,cw,imp,streak,dRev,user,cloudOk]);
 
-export default function MandarinTrainer() {
-  const [cards, setCards] = useState(() => {
-    try { const s = localStorage.getItem("mandarin_srs_v2"); if (s) { const p = JSON.parse(s); if (p.length > 30) return p; } } catch {} return initSRS(BOOK_WORDS);
-  });
-  const [view, setView] = useState("home");
-  const [currentCard, setCurrentCard] = useState(null);
-  const [flipped, setFlipped] = useState(false);
-  const [filter, setFilter] = useState("all");
-  const [sessionStats, setSessionStats] = useState({ reviewed: 0, correct: 0 });
-  const [showPinyin, setShowPinyin] = useState(false);
-  const [animateCard, setAnimateCard] = useState("");
-  const [newWord, setNewWord] = useState({ hanzi: "", pinyin: "", english: "", category: "health & illness" });
-  const [searchTerm, setSearchTerm] = useState("");
-  const [maxCards, setMaxCards] = useState(20);
-  const [sessionQueue, setSessionQueue] = useState([]);
+  const uStreak=(newDRevCount,updatedCards,updatedCw)=>{const today=td();setStreak(p=>{if(p.last===today)return p;const allCards=[...updatedCards,...updatedCw];const dueLeft=gd(allCards).length;if(newDRevCount>=10||dueLeft===0){const y=new Date(Date.now()-DAY).toISOString().slice(0,10);return p.last===y?{count:p.count+1,last:today}:{count:1,last:today};}return p;});};
+  const sIn=async()=>{try{await signInWithPopup(auth,gProv);}catch(e){console.error(e);}};
+  const sOut=async()=>{try{loadedRef.current=false;setCloudOk(false);hadDataRef.current=false;await signOut(auth);setCards([]);setCw([]);setImp([]);prevDataRef.current=null;setVw("home");}catch(e){console.error(e);}};
 
-  useEffect(() => { try { localStorage.setItem("mandarin_srs_v2", JSON.stringify(cards)); } catch {} }, [cards]);
+  const ac=[...cards,...cw],fc2=ft==="all"?ac:ft==="class"?cw:ac.filter(c=>c.g===ft),du=gd(fc2);
+  const impD=k=>{if(imp.includes(k))return;setCards(p=>[...p,...AW.filter(w=>w.g===k).map(ic)]);setImp(p=>[...p,k]);};
+  const addCw=()=>{if(!nw.h||!nw.e)return;const id=2000+Date.now()%1e6;setCw(p=>[...p,{...ic({id,h:san(nw.h),p:san(nw.p),e:san(nw.e),g:"class"})}]);setNw({h:"",p:"",e:""});};
+  const parseCsv=f=>{if(f.size>MAX_CSV_FILE){alert("File too large (max 512 KB)");return;}const r=new FileReader();r.onload=e=>{const txt=e.target.result.trim();if(!txt)return;const sep=txt.includes("\t")?"\t":",";const rows=txt.split(/\r?\n/).slice(0,MAX_CSV_ROWS+1).map(l=>l.split(sep).map(c=>san(c.trim().replace(/^["']|["']$/g,""))));let data=rows;if(data.length>1&&/^(hanzi|chinese|汉字)/i.test(data[0][0]))data=data.slice(1);data=data.slice(0,MAX_CSV_ROWS);const words=data.filter(r=>r.length>=2&&r[0]).map(r=>({h:r[0],p:r.length>=3?r[1]:"",e:r.length>=3?r[2]:r[1]}));if(words.length)setCsvPv(words);};r.readAsText(f);};
+  const confirmCsv=()=>{if(!csvPv)return;const base=2000+Date.now()%1e6;const nws=csvPv.map((w,i)=>ic({id:base+i,h:san(w.h),p:san(w.p),e:san(w.e),g:"class"}));setCw(p=>[...p,...nws]);setCsvPv(null);};
+  const shuffle=a=>{const s=[...a];for(let i=s.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[s[i],s[j]]=[s[j],s[i]];}return s;};
+  const go=()=>{setSt({r:0,c:0});const d=shuffle(gd(ft==="all"?ac:ft==="class"?cw:ac.filter(c=>c.g===ft)).slice(0,mc));if(d.length){setQu(d);setCur(d[0]);setFl(false);setSp(false);setTy("");setTr2(null);setVw("review");}};
+  const rate=ok=>{if(!cur)return;setAn(ok?"correct":"incorrect");setTimeout(()=>{setAn("");const rep=ok?cur.rep+1:0;const nxt=dueIn(SD[Math.min(rep,6)]);const up=p=>p.map(c=>c.id===cur.id?{...c,rep,nr:nxt,lr:Date.now(),cc:c.cc+(ok?1:0),ic:c.ic+(ok?0:1)}:c);const newCards=cur.g==="class"?cards:up(cards);const newCw=cur.g==="class"?up(cw):cw;if(cur.g==="class")setCw(up);else setCards(up);const today=td();const newDRev=dRev.date===today?{date:today,count:dRev.count+1}:{date:today,count:1};setDRev(newDRev);uStreak(newDRev.count,newCards,newCw);setSt(s=>({r:s.r+1,c:s.c+(ok?1:0)}));setQu(p=>{const r=p.filter(c=>c.id!==cur.id);if(!ok)r.push(cur);if(r.length){setCur(r[0]);setFl(false);setSp(false);setTy("");setTr2(null);setTimeout(()=>{if(rf.current)rf.current.focus();},100);}else setVw("summary");return r;});},450);};
+  const chk=()=>{if(!cur||tr2)return;const r=fm(ty,qd==="en"?cur.p:cur.e);setTr2(r);setFl(true);if(r!=="wrong")setTimeout(()=>rate(true),1e3);};
 
-  const filteredCards = filter === "all" ? cards : cards.filter(c => c.category === filter);
-  const dueCards = getDueCards(filteredCards);
+  useEffect(()=>{if(vw!=="review")return;const h=e=>{if(md==="flashcard"&&e.code==="Space"&&!fl){e.preventDefault();setFl(true);}if(fl&&(md==="flashcard"||(md==="typing"&&tr2==="wrong"))){if(e.code==="ArrowLeft"){e.preventDefault();rate(false);}if(e.code==="ArrowRight"){e.preventDefault();rate(true);}}};window.addEventListener("keydown",h);return()=>window.removeEventListener("keydown",h);},[vw,md,fl,tr2]);
+  const saveWordEdit=(id)=>{const up=p=>p.map(c=>{if(c.id!==id)return c;const u={...c,h:san(editW.h),p:san(editW.p),e:san(editW.e)};if(editStg!==null){u.rep=editStg;u.nr=dueIn(SD[Math.min(editStg,6)]);}return u;});if(cw.some(c=>c.id===id))setCw(up);else setCards(up);setExpWord(null);setEditStg(null);};
+  const fmtAgo=ts=>{if(!ts)return"Never";const d=Math.floor((Date.now()-ts)/DAY);if(d===0)return"Today";if(d===1)return"Yesterday";return`${d} days ago`;};
+  const fmtDue=(c)=>{if(c.rep>=6)return"Mastered";const todayStart=startOfDay(Date.now());const dueDay=startOfDay(c.nr);if(dueDay<=todayStart)return"Due now";const d=Math.round((dueDay-todayStart)/DAY);if(d===1)return"Due tomorrow";return`Due in ${d} days`;};
+  const mst=ac.filter(c=>c.rep>=6).length,lrn=ac.filter(c=>c.rep>0&&c.rep<6).length,nwc=ac.filter(c=>c.rep===0).length;
+  const ttr=ac.reduce((a,c)=>a+c.cc+c.ic,0),ttc=ac.reduce((a,c)=>a+c.cc,0),acc2=ttr?Math.round(ttc/ttr*100):0;
+  const sdd=SL.map((_,i)=>ac.filter(c=>gs(c.rep)===i).length);
+  const dFor=k=>gd(ac.filter(c=>c.g===k)).length;
+  const dCh=ch=>gd(ac.filter(c=>DL.some(d=>d.ch===ch&&d.key===c.g))).length;
 
-  const startReview = () => {
-    setSessionStats({ reviewed: 0, correct: 0 });
-    const due = getDueCards(filter === "all" ? cards : cards.filter(c => c.category === filter));
-    const queue = due.slice(0, maxCards);
-    if (queue.length > 0) { setSessionQueue(queue); setCurrentCard(queue[0]); setFlipped(false); setShowPinyin(false); setView("review"); }
-  };
+  if(aL)return<div style={{...T.app,display:"flex",alignItems:"center",justifyContent:"center",minHeight:"100vh"}}><style>{CSS}</style><div style={{textAlign:"center"}}><span style={{fontSize:40,fontWeight:900,color:"#e07a5f"}}>师</span><p style={{color:"#94a3b8",marginTop:8,fontFamily:"'DM Sans',sans-serif",fontSize:13}}>Loading...</p></div></div>;
+  if(!user)return(<div style={{...T.app,display:"flex",alignItems:"center",justifyContent:"center",minHeight:"100vh"}}><style>{CSS}</style><div style={{textAlign:"center",animation:"fu .5s ease both"}}><span style={{fontSize:64,fontWeight:900,color:"#e07a5f",display:"block",marginBottom:6}}>师</span><h1 style={{fontSize:26,fontWeight:700,color:"#2d3748",marginBottom:2,fontFamily:"'DM Sans',sans-serif"}}>Chinese Shifu</h1><p style={{fontSize:11,color:"#94a3b8",letterSpacing:"0.08em",textTransform:"uppercase",marginBottom:36,fontFamily:"'DM Sans',sans-serif"}}>Integrated Chinese Vocabulary Trainer</p><button onClick={sIn} style={{...T.btn,display:"inline-flex",alignItems:"center",gap:10,width:"auto",padding:"14px 32px"}}><svg width="18" height="18" viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg>Sign in with Google</button><p style={{color:"#a0aec0",fontSize:11,marginTop:20,fontFamily:"'DM Sans',sans-serif"}}>Sign in to sync progress across devices</p></div></div>);
 
-  const handleRating = (quality) => {
-    if (!currentCard) return;
-    const isCorrect = quality >= 3;
-    setAnimateCard(isCorrect ? "correct" : "incorrect");
-    setTimeout(() => {
-      setAnimateCard("");
-      const updated = sm2(currentCard, quality);
-      setCards(prev => prev.map(c => c.id === currentCard.id ? { ...c, ...updated, lastReviewed: Date.now(), correctCount: c.correctCount + (isCorrect ? 1 : 0), incorrectCount: c.incorrectCount + (isCorrect ? 0 : 1) } : c));
-      setSessionStats(s => ({ reviewed: s.reviewed + 1, correct: s.correct + (isCorrect ? 1 : 0) }));
-      setSessionQueue(prev => {
-        const remaining = prev.filter(c => c.id !== currentCard.id);
-        if (!isCorrect) remaining.push(currentCard);
-        if (remaining.length > 0) { setCurrentCard(remaining[0]); setFlipped(false); setShowPinyin(false); } else { setView("summary"); }
-        return remaining;
-      });
-    }, 400);
-  };
+  return(<div style={T.app}><style>{CSS}</style>
+    <header style={T.hdr}><div style={{display:"flex",alignItems:"center",gap:8,cursor:"pointer"}} onClick={()=>setVw("home")}><span style={{fontSize:20,fontWeight:900,color:"#e07a5f"}}>师</span><h1 style={{fontSize:14,fontWeight:700,color:"#2d3748"}}>Chinese Shifu</h1></div><div style={{display:"flex",alignItems:"center",gap:3}}><div style={{display:"flex",alignItems:"center",gap:3,padding:"3px 8px",borderRadius:16,background:streak.last===td()?"#fff7ed":"#f8fafc",border:"1px solid "+(streak.last===td()?"#fed7aa":"#e2e8f0")}}><span style={{fontSize:12}}>🔥</span><span style={{fontSize:11,fontWeight:600,color:streak.last===td()?"#ea580c":"#94a3b8"}}>{streak.count}</span></div>{[{k:"home",l:"Study"},{k:"chapters",l:"Chapters"},{k:"progress",l:"Stats"},{k:"words",l:"Words"}].map(x=><button key={x.k} onClick={()=>setVw(x.k)} style={{...T.nb,...(vw===x.k?T.nba:{})}}>{x.l}</button>)}{saving&&<span style={{fontSize:8,color:"#a0aec0"}}>⟳</span>}{user.photoURL?<img src={user.photoURL} alt="" style={{width:24,height:24,borderRadius:"50%",cursor:"pointer",border:"2px solid #e2e8f0",marginLeft:2}} onClick={sOut} title="Sign out"/>:<button onClick={sOut} style={{...T.nb,fontSize:9}}>Out</button>}</div></header>
+    <main style={T.main}>
 
-  const addWord = () => {
-    if (!newWord.hanzi || !newWord.english) return;
-    const id = Math.max(...cards.map(c => c.id), 0) + 1;
-    setCards(prev => [...prev, { ...newWord, id, interval: 0, repetitions: 0, easeFactor: 2.5, nextReview: Date.now(), lastReviewed: null, correctCount: 0, incorrectCount: 0 }]);
-    setNewWord({ hanzi: "", pinyin: "", english: "", category: newWord.category });
-  };
-
-  const resetProgress = () => { if (window.confirm("Reset all progress? Word list kept, SRS data cleared.")) { setCards(prev => prev.map(c => ({ ...c, interval: 0, repetitions: 0, easeFactor: 2.5, nextReview: Date.now(), lastReviewed: null, correctCount: 0, incorrectCount: 0 }))); setView("home"); } };
-  const resetAll = () => { if (window.confirm("Reset everything to original textbook words?")) { setCards(initSRS(BOOK_WORDS)); setView("home"); } };
-
-  const masteredCount = cards.filter(c => c.repetitions >= 4).length;
-  const learningCount = cards.filter(c => c.repetitions > 0 && c.repetitions < 4).length;
-  const newCount = cards.filter(c => c.repetitions === 0).length;
-  const totalReviews = cards.reduce((a, c) => a + c.correctCount + c.incorrectCount, 0);
-  const totalCorrect = cards.reduce((a, c) => a + c.correctCount, 0);
-  const accuracy = totalReviews > 0 ? Math.round((totalCorrect / totalReviews) * 100) : 0;
-  const searchedWords = searchTerm ? cards.filter(c => c.hanzi.includes(searchTerm) || c.pinyin.toLowerCase().includes(searchTerm.toLowerCase()) || c.english.toLowerCase().includes(searchTerm.toLowerCase())) : filteredCards;
-
-  return (
-    <div style={S.app}>
-      <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@400;700;900&family=DM+Sans:ital,wght@0,400;0,500;0,700;1,400&display=swap');
-        *{box-sizing:border-box;margin:0;padding:0}
-        @keyframes fadeUp{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:translateY(0)}}
-        @keyframes cardCorrect{0%{transform:scale(1)}50%{transform:scale(1.04);box-shadow:0 0 40px rgba(72,187,120,0.4)}100%{transform:scale(1)}}
-        @keyframes cardIncorrect{0%,100%{transform:translateX(0)}20%{transform:translateX(-8px)}40%{transform:translateX(8px)}60%{transform:translateX(-4px)}80%{transform:translateX(4px)}}
-        @keyframes float{0%,100%{transform:translateY(0)}50%{transform:translateY(-6px)}}
-        input::placeholder{color:#6b5f52}
-        ::-webkit-scrollbar{width:6px}::-webkit-scrollbar-track{background:transparent}::-webkit-scrollbar-thumb{background:rgba(196,164,124,0.2);border-radius:3px}
-      `}</style>
-      <div style={S.bgD1}/><div style={S.bgD2}/>
-
-      <header style={S.header}>
-        <div style={S.headerLeft} onClick={()=>setView("home")}>
-          <span style={S.logo}>墨</span>
-          <div><h1 style={S.title}>MòXué</h1><p style={S.subtitle}>Integrated Chinese</p></div>
+    {vw==="home"&&<div style={{animation:"fu .4s ease both"}}>
+      <div style={{display:"flex",gap:8,marginBottom:14}}>{[{v:du.length,l:"Due",c:"#e07a5f"},{v:ac.length,l:"Active",c:"#6366f1"},{v:`${sdd[6]}/${ac.length}`,l:"Mastered",c:"#8b5cf6"}].map((s,i)=><div key={i} style={{flex:1,textAlign:"center",padding:"12px 4px",borderRadius:10,background:"#fff",border:"1px solid #f1f5f9"}}><div style={{fontSize:24,fontWeight:700,color:s.c,fontFamily:"'Noto Serif SC',serif"}}>{s.v}</div><div style={{fontSize:9,color:"#94a3b8",textTransform:"uppercase",marginTop:1}}>{s.l}</div></div>)}</div>
+      {ac.length===0?<div style={{textAlign:"center",padding:"40px 20px",color:"#94a3b8"}}><p style={{fontSize:32,marginBottom:8}}>📚</p><p style={{fontSize:14,fontWeight:600,color:"#64748b"}}>No words imported yet</p><p style={{fontSize:12,marginTop:4}}>Go to <span style={{color:"#e07a5f",cursor:"pointer",fontWeight:600}} onClick={()=>setVw("chapters")}>Chapters</span> to import vocabulary.</p></div>:<>
+        <div style={{background:"#fff",borderRadius:10,padding:12,border:"1px solid #f1f5f9",marginBottom:12}}><div style={{fontSize:10,fontWeight:600,color:"#64748b",marginBottom:6}}>SRS Stages</div><div style={{display:"flex",gap:1,height:6,borderRadius:3,overflow:"hidden",background:"#f1f5f9",marginBottom:6}}>{sdd.map((n,i)=>n>0&&<div key={i} style={{width:`${(n/ac.length)*100}%`,background:SC[i]}}/>)}</div><div style={{display:"flex",flexWrap:"wrap",gap:5}}>{SL.map((l,i)=>sdd[i]>0&&<span key={i} style={{fontSize:9,color:"#64748b",display:"flex",alignItems:"center",gap:2}}><span style={{width:6,height:6,borderRadius:1,background:SC[i],display:"inline-block"}}/>{l}: {sdd[i]}</span>)}</div></div>
+        <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:10}}>
+          <div style={{display:"flex",alignItems:"center",gap:3}}><span style={{fontSize:9,color:"#94a3b8"}}>Cards:</span>{[10,20,Infinity].map(n=><button key={n} onClick={()=>setMc(n)} style={{...T.ch,...(mc===n?T.cha:{}),padding:"2px 8px",fontSize:9}}>{n===Infinity?"All":n}</button>)}</div>
+          <button onClick={()=>setShowSett(s=>!s)} style={{display:"flex",alignItems:"center",gap:4,background:showSett?"#f1f5f9":"transparent",border:"1px solid "+(showSett?"#e2e8f0":"#e2e8f0"),borderRadius:7,padding:"3px 10px",cursor:"pointer",fontFamily:"inherit",fontSize:10,color:"#94a3b8"}}><span style={{fontSize:13,lineHeight:1}}>⚙</span>Settings</button>
         </div>
-        <nav style={S.nav}>
-          {[{k:"home",l:"Study",i:"◉"},{k:"progress",l:"Stats",i:"◐"},{k:"words",l:"Words",i:"册"}].map(x=>(
-            <button key={x.k} onClick={()=>setView(x.k)} style={{...S.navBtn,...(view===x.k?S.navBtnA:{})}}><span style={S.navI}>{x.i}</span>{x.l}</button>
-          ))}
-        </nav>
-      </header>
+        {showSett&&<div style={{background:"#fff",borderRadius:10,border:"1px solid #f1f5f9",padding:12,marginBottom:12,animation:"fu .2s ease both"}}>
+          <div style={{fontSize:10,fontWeight:600,color:"#64748b",marginBottom:6}}>Mode</div>
+          <div style={{display:"flex",background:"#f1f5f9",borderRadius:7,overflow:"hidden",marginBottom:10}}>{["flashcard","typing"].map(m=><button key={m} onClick={()=>setMd(m)} style={{flex:1,padding:"5px 11px",fontSize:10,fontWeight:500,border:"none",cursor:"pointer",fontFamily:"inherit",background:md===m?"#fff":"transparent",color:md===m?"#2d3748":"#94a3b8",boxShadow:md===m?"0 1px 2px rgba(0,0,0,0.05)":"none",borderRadius:md===m?5:0}}>{m==="flashcard"?"📇 Flashcard":"⌨️ Typing"}</button>)}</div>
+          <div style={{fontSize:10,fontWeight:600,color:"#64748b",marginBottom:6}}>Quiz Direction</div>
+          <div style={{display:"flex",flexDirection:"column",gap:4}}>{[{k:"hz",l:"Hanzi → English"},{k:"py",l:"Pinyin + Hanzi → English"},{k:"en",l:"English → Pinyin + Hanzi"}].map(o=><button key={o.k} onClick={()=>setQd(o.k)} style={{display:"flex",alignItems:"center",gap:8,padding:"6px 10px",borderRadius:7,border:"1px solid "+(qd===o.k?"#e07a5f40":"#f1f5f9"),background:qd===o.k?"#e07a5f08":"#fafbfc",cursor:"pointer",fontFamily:"inherit",textAlign:"left"}}><span style={{width:8,height:8,borderRadius:"50%",border:"2px solid "+(qd===o.k?"#e07a5f":"#cbd5e1"),background:qd===o.k?"#e07a5f":"transparent",flexShrink:0}}/><span style={{fontSize:11,fontWeight:600,color:qd===o.k?"#e07a5f":"#475569"}}>{o.l}</span></button>)}</div>
+        </div>}
+        <div style={{background:"#fff",borderRadius:10,border:"1px solid #f1f5f9",marginBottom:12,overflow:"hidden"}}>
+          <button onClick={()=>setFt("all")} style={{...T.fb,...(ft==="all"?{background:"#e07a5f08",color:"#e07a5f"}:{})}}>All words <span style={{fontSize:10,color:ft==="all"?"#e07a5f":"#94a3b8",fontWeight:400}}>({gd(ac).length} due)</span></button>
+          {cw.length>0&&<button onClick={()=>setFt("class")} style={{...T.fb,...(ft==="class"?{background:"#e07a5f08",color:"#e07a5f"}:{})}}>📝 My Class Words <span style={{fontSize:10,color:ft==="class"?"#e07a5f":"#94a3b8",fontWeight:400}}>({gd(cw).length} due)</span></button>}
+          {BOOKS.filter(b=>!b.soon&&b.chs.some(ch=>DL.filter(d=>d.ch===ch).some(d=>imp.includes(d.key)))).map(b=>
+            <Fold key={b.n} label={b.label} badge={`${gd(ac.filter(c=>b.chs.some(ch=>DL.filter(d=>d.ch===ch).some(d=>d.key===c.g)))).length} due`}>
+              {b.chs.filter(ch=>DL.filter(d=>d.ch===ch).some(d=>imp.includes(d.key))).map(ch=>
+                <Fold key={ch} label={`Chapter ${ch} — ${CH_T[ch]}`} badge={`${dCh(ch)} due`}>
+                  {DL.filter(d=>d.ch===ch&&imp.includes(d.key)).map(d=>
+                    <button key={d.key} onClick={()=>setFt(d.key)} style={{...T.fb,paddingLeft:16,fontSize:12,...(ft===d.key?{background:"#e07a5f08",color:"#e07a5f"}:{})}}>Dialogue {d.d} <span style={{fontSize:10,color:ft===d.key?"#e07a5f":"#94a3b8",fontWeight:400}}>({dFor(d.key)} due)</span></button>
+                  )}
+                </Fold>)}
+            </Fold>)}
+        </div>
+        <button onClick={go} disabled={du.length===0} style={{...T.btn,...(du.length===0?T.bd:{})}}>
+          {du.length?`Study ${mc===Infinity?du.length:Math.min(du.length,mc)} Card${(mc===Infinity?du.length:Math.min(du.length,mc))>1?"s":""}`:"All caught up! 🎉"}</button>
+      </>}
+    </div>}
 
-      <main style={S.main}>
-        {view==="home"&&(
-          <div style={{animation:"fadeUp 0.4s ease both"}}>
-            <div style={S.heroStats}>
-              <div style={S.heroBox}><span style={S.heroNum}>{dueCards.length}</span><span style={S.heroLbl}>due now</span></div>
-              <div style={S.heroDiv}/>
-              <div style={S.heroBox}><span style={S.heroNum}>{cards.length}</span><span style={S.heroLbl}>total words</span></div>
-              <div style={S.heroDiv}/>
-              <div style={S.heroBox}><span style={S.heroNum}>{accuracy}%</span><span style={S.heroLbl}>accuracy</span></div>
-            </div>
-            <div style={S.pBars}>
-              <div style={S.pLabel}>
-                <span><span style={{color:"#e53e3e"}}>●</span> New {newCount}</span>
-                <span><span style={{color:"#f6ad55"}}>●</span> Learning {learningCount}</span>
-                <span><span style={{color:"#48bb78"}}>●</span> Mastered {masteredCount}</span>
-              </div>
-              <div style={S.pTrack}>
-                <div style={{...S.pFill,width:`${(masteredCount/cards.length)*100}%`,background:"#48bb78"}}/>
-                <div style={{...S.pFill,width:`${(learningCount/cards.length)*100}%`,background:"#f6ad55"}}/>
-                <div style={{...S.pFill,width:`${(newCount/cards.length)*100}%`,background:"#e53e3e"}}/>
-              </div>
-            </div>
-            <div style={{marginTop:20,marginBottom:8,display:"flex",alignItems:"center",gap:10}}>
-              <span style={{fontSize:12,color:"#8a7e6e"}}>Session size:</span>
-              {[10,20,30,50].map(n=><button key={n} onClick={()=>setMaxCards(n)} style={{...S.chip,...(maxCards===n?S.chipA:{}),padding:"4px 12px"}}>{n}</button>)}
-            </div>
-            <div style={S.filterRow}>
-              {CATEGORIES.map(cat=>{
-                const due=cat==="all"?dueCards.length:getDueCards(cards.filter(c=>c.category===cat)).length;
-                return <button key={cat} onClick={()=>setFilter(cat)} style={{...S.chip,...(filter===cat?S.chipA:{})}}>
-                  {cat!=="all"&&<span style={{marginRight:4}}>{CATEGORY_ICONS[cat]}</span>}
-                  {cat==="all"?`All (${due} due)`:`${cat} (${due})`}
-                </button>;
-              })}
-            </div>
-            <button onClick={startReview} disabled={dueCards.length===0} style={{...S.startBtn,...(dueCards.length===0?S.startDis:{}),marginTop:20}}>
-              {dueCards.length>0?`Study ${Math.min(dueCards.length,maxCards)} Card${Math.min(dueCards.length,maxCards)>1?"s":""}`:"All caught up! 🎉"}
-            </button>
-          </div>
-        )}
+    {vw==="chapters"&&<div style={{animation:"fu .4s ease both"}}>
+      <h2 style={T.sc}>Import Chapters</h2><p style={{fontSize:12,color:"#94a3b8",marginBottom:16}}>Import vocabulary after studying each dialogue. Words appear in reviews only after import.</p>
+      {BOOKS.map(b=><div key={b.n} style={{marginBottom:12}}><Fold label={b.label} badge={b.soon?"Coming soon":undefined}>
+        {b.soon?<p style={{fontSize:11,color:"#cbd5e1",padding:"8px 12px"}}>Chapters {b.chs[0]}–{b.chs[b.chs.length-1]} will be added soon.</p>:
+        b.chs.map(ch=>{const ds=DL.filter(d=>d.ch===ch);const allDone=ds.every(d=>imp.includes(d.key));
+          return <Fold key={ch} label={<span>Chapter {ch} — {CH_T[ch]} {allDone&&<span style={{color:"#22c55e",fontSize:10,marginLeft:4}}>✓</span>}</span>}>
+            {ds.map(d=>{const done=imp.includes(d.key);const wc=AW.filter(w=>w.g===d.key);const pv=wc.slice(0,4).map(w=>w.h).join(" · ");
+              return <div key={d.key} style={{display:"flex",alignItems:"center",gap:10,padding:"8px 12px",borderBottom:"1px solid #fafbfc"}}><div style={{flex:1}}><div style={{fontSize:12,fontWeight:600,color:done?"#22c55e":"#475569"}}>Dialogue {d.d}</div><div style={{fontSize:10,color:"#a0aec0",marginTop:2}}>{wc.length} words · {pv}…</div></div>{done?<span style={{fontSize:10,color:"#22c55e",fontWeight:600,padding:"4px 12px",borderRadius:8,background:"#f0fdf4"}}>✓ Imported</span>:<button onClick={()=>impD(d.key)} style={{padding:"6px 14px",borderRadius:8,border:"1px solid #e07a5f40",background:"#e07a5f08",color:"#e07a5f",fontSize:11,fontWeight:600,cursor:"pointer",fontFamily:"inherit"}}>+ Import</button>}</div>;})}
+          </Fold>;})}
+      </Fold></div>)}
+      <div style={{background:"#fff",borderRadius:12,border:"1px solid #f1f5f9",padding:14,marginTop:8}}><div style={{fontSize:13,fontWeight:700,color:"#2d3748",marginBottom:4}}>📝 My Class Words</div><p style={{fontSize:11,color:"#94a3b8",marginBottom:10}}>Add words from class not in the textbook.</p><div style={{display:"flex",flexDirection:"column",gap:5}}><input placeholder="汉字" value={nw.h} onChange={e=>setNw(p=>({...p,h:e.target.value}))} maxLength={MAX_FIELD} style={{...T.ip,fontFamily:"'Noto Serif SC',serif",fontSize:16}}/><input placeholder="Pīnyīn" value={nw.p} onChange={e=>setNw(p=>({...p,p:e.target.value}))} maxLength={MAX_FIELD} style={T.ip}/><input placeholder="English" value={nw.e} onChange={e=>setNw(p=>({...p,e:e.target.value}))} maxLength={MAX_FIELD} style={T.ip}/><div style={{display:"flex",gap:6}}><button onClick={addCw} style={{...T.btn,flex:1,padding:9,fontSize:12}}>+ Add Word</button><label style={{...T.btn,flex:1,padding:9,fontSize:12,textAlign:"center",cursor:"pointer",background:"#f8fafc",color:"#475569",border:"1px solid #e2e8f0"}}>📄 Upload CSV<input type="file" accept=".csv,.tsv,.txt" hidden onChange={e=>{if(e.target.files[0])parseCsv(e.target.files[0]);e.target.value="";}}/></label></div></div>{csvPv&&<div style={{background:"#fefce8",border:"1px solid #fde68a",borderRadius:10,padding:12,marginTop:10}}><div style={{fontSize:12,fontWeight:700,color:"#92400e",marginBottom:6}}>Preview — {csvPv.length} word{csvPv.length>1?"s":""} found</div><div style={{maxHeight:180,overflowY:"auto",display:"flex",flexDirection:"column",gap:2}}>{csvPv.map((w,i)=><div key={i} style={{display:"flex",gap:8,alignItems:"center",fontSize:11,padding:"3px 6px",background:"#fff",borderRadius:5}}><span style={{fontFamily:"'Noto Serif SC',serif",fontWeight:700,minWidth:36}}>{w.h}</span><span style={{color:"#e07a5f",fontStyle:"italic",minWidth:50}}>{w.p}</span><span style={{color:"#64748b",flex:1}}>{w.e}</span></div>)}</div><div style={{display:"flex",gap:6,marginTop:8}}><button onClick={confirmCsv} style={{...T.btn,flex:1,padding:8,fontSize:11}}>✓ Import All</button><button onClick={()=>setCsvPv(null)} style={{flex:1,padding:8,fontSize:11,borderRadius:8,border:"1px solid #e2e8f0",background:"#fff",color:"#94a3b8",cursor:"pointer",fontFamily:"inherit"}}>Cancel</button></div></div>}{cw.length>0&&<div style={{marginTop:8,display:"flex",flexWrap:"wrap",gap:4}}>{cw.map(c=><span key={c.id} style={{fontSize:11,padding:"2px 8px",borderRadius:6,background:"#f8fafc",border:"1px solid #f1f5f9",color:"#475569"}}>{c.h}</span>)}</div>}</div>
+    </div>}
 
-        {view==="review"&&currentCard&&(
-          <div style={{animation:"fadeUp 0.3s ease both"}}>
-            <div style={S.revHead}>
-              <span style={{fontSize:13,color:"#8a7e6e"}}>{sessionQueue.length} remaining</span>
-              <button onClick={()=>setView("home")} style={S.exitBtn}>✕ Exit</button>
-            </div>
-            <div onClick={()=>!flipped&&setFlipped(true)} style={{...S.card,...(animateCard==="correct"?{animation:"cardCorrect 0.4s ease"}:animateCard==="incorrect"?{animation:"cardIncorrect 0.4s ease"}:{}),cursor:flipped?"default":"pointer"}}>
-              <div style={S.cardCat}>{CATEGORY_ICONS[currentCard.category]} {currentCard.category}</div>
-              <div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:8}}>
-                <span style={S.hanzi}>{currentCard.hanzi}</span>
-                {showPinyin&&<span style={S.pinyin}>{currentCard.pinyin}</span>}
-                {!showPinyin&&!flipped&&<button onClick={e=>{e.stopPropagation();setShowPinyin(true)}} style={S.hintBtn}>Show pinyin</button>}
-              </div>
-              {!flipped&&<p style={{fontSize:12,color:"#5a5347",marginTop:20,letterSpacing:"0.05em"}}>Tap to reveal meaning</p>}
-              {flipped&&<div style={{marginTop:16,display:"flex",flexDirection:"column",alignItems:"center",gap:6,animation:"fadeUp 0.3s ease both"}}>
-                <div style={{width:40,height:1,background:"rgba(196,164,124,0.3)",marginBottom:6}}/>
-                <span style={S.pinyin}>{currentCard.pinyin}</span>
-                <span style={{fontSize:22,fontWeight:700,color:"#e8e0d4"}}>{currentCard.english}</span>
-              </div>}
-            </div>
-            {flipped&&<div style={S.ratingRow}>
-              {[{q:1,l:"Again",i:"✕",s:S.rA},{q:3,l:"Hard",i:"◑",s:S.rH},{q:4,l:"Good",i:"◉",s:S.rG},{q:5,l:"Easy",i:"★",s:S.rE}].map(r=>
-                <button key={r.q} onClick={()=>handleRating(r.q)} style={{...S.rateBtn,...r.s}}>
-                  <span style={{fontSize:17}}>{r.i}</span>{r.l}
-                </button>
-              )}
-            </div>}
-          </div>
-        )}
+    {vw==="review"&&cur&&<div style={{animation:"fu .3s ease both"}}>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}><div style={{display:"flex",alignItems:"center",gap:6}}><span style={{fontSize:11,color:"#94a3b8"}}>{qu.length} left</span><span style={{fontSize:9,padding:"2px 7px",borderRadius:8,background:SC[gs(cur.rep)]+"18",color:SC[gs(cur.rep)],fontWeight:600}}>{SL[gs(cur.rep)]}</span></div><button onClick={()=>setVw("home")} style={{background:"#f8fafc",border:"1px solid #e2e8f0",borderRadius:7,padding:"3px 9px",fontSize:11,color:"#94a3b8",cursor:"pointer",fontFamily:"inherit"}}>✕</button></div>
+      <div onClick={()=>md==="flashcard"&&!fl&&setFl(true)} style={{...T.cd,...(an==="correct"?{animation:"pop .45s ease",borderColor:"#22c55e"}:an==="incorrect"?{animation:"shk .4s ease",borderColor:"#ef4444"}:{}),cursor:md==="flashcard"&&!fl?"pointer":"default"}}>
+        {qd==="hz"&&<><span style={{fontFamily:"'Noto Serif SC',serif",fontSize:56,fontWeight:900,color:"#2d3748",lineHeight:1.1}}>{cur.h}</span>{sp&&<span style={{fontSize:15,color:"#e07a5f",fontStyle:"italic",marginTop:6}}>{cur.p}</span>}{!sp&&!fl&&<button onClick={e=>{e.stopPropagation();setSp(true);}} style={{background:"#f8fafc",border:"1px solid #e2e8f0",borderRadius:7,padding:"3px 11px",fontSize:10,color:"#94a3b8",cursor:"pointer",fontFamily:"inherit",marginTop:8}}>Show pinyin</button>}</>}
+        {qd==="py"&&<><span style={{fontSize:28,fontWeight:700,color:"#e07a5f",fontStyle:"italic",lineHeight:1.2}}>{cur.p}</span><span style={{fontFamily:"'Noto Serif SC',serif",fontSize:36,fontWeight:900,color:"#2d3748",marginTop:6}}>{cur.h}</span></>}
+        {qd==="en"&&<><span style={{fontSize:20,fontWeight:700,color:"#2d3748",lineHeight:1.3,textAlign:"center"}}>{cur.e}</span></>}
+        {md==="typing"&&!fl&&<div style={{marginTop:16,width:"100%",maxWidth:260}}><input ref={rf} autoFocus placeholder={qd==="en"?"Pinyin...":"English meaning..."} value={ty} onChange={e=>setTy(e.target.value)} maxLength={MAX_FIELD} onKeyDown={e=>{if(e.key==="Enter")chk();}} style={{...T.ip,textAlign:"center",fontSize:14,padding:"10px 12px"}}/><button onClick={chk} style={{...T.btn,marginTop:6,padding:9,fontSize:12}}>Check</button></div>}
+        {md==="flashcard"&&!fl&&<>{st.r<2&&<p style={{fontSize:9,color:"#cbd5e1",marginTop:16}}>Tap or press space to reveal</p>}</>}
+        {fl&&<div style={{marginTop:12,animation:"fu .25s ease both",textAlign:"center"}}><div style={{width:32,height:1,background:"#e2e8f0",margin:"0 auto 8px"}}/>{qd==="en"?<><span style={{fontSize:15,color:"#e07a5f",fontStyle:"italic",display:"block"}}>{cur.p}</span><span style={{fontFamily:"'Noto Serif SC',serif",fontSize:32,fontWeight:900,color:"#2d3748",display:"block",marginTop:3}}>{cur.h}</span></>:qd==="hz"?<>{!sp&&<span style={{fontSize:15,color:"#e07a5f",fontStyle:"italic",display:"block",marginBottom:3}}>{cur.p}</span>}<span style={{fontSize:19,fontWeight:700,color:"#2d3748",display:"block"}}>{cur.e}</span></>:<span style={{fontSize:19,fontWeight:700,color:"#2d3748",display:"block"}}>{cur.e}</span>}{tr2&&<div style={{marginTop:5,fontSize:11,fontWeight:600,color:tr2==="wrong"?"#ef4444":"#22c55e"}}>{tr2==="wrong"?"✕ Incorrect":"✓ Correct!"}</div>}</div>}
+      </div>
+      {fl&&(md==="flashcard"||(md==="typing"&&tr2==="wrong"))&&<><div style={{display:"flex",gap:8,marginTop:12}}><button onClick={()=>rate(false)} style={{flex:1,padding:"13px",borderRadius:11,border:"1px solid #fecaca",background:"#fef2f2",cursor:"pointer",fontFamily:"inherit",fontSize:14,fontWeight:600,color:"#ef4444"}}>✕ Incorrect</button><button onClick={()=>rate(true)} style={{flex:1,padding:"13px",borderRadius:11,border:"1px solid #bbf7d0",background:"#f0fdf4",cursor:"pointer",fontFamily:"inherit",fontSize:14,fontWeight:600,color:"#22c55e"}}>✓ Correct</button></div>{st.r<2&&<p style={{fontSize:9,color:"#cbd5e1",textAlign:"center",marginTop:6}}>← Incorrect · → Correct</p>}</>}
+    </div>}
 
-        {view==="summary"&&(
-          <div style={{display:"flex",justifyContent:"center",paddingTop:32,animation:"fadeUp 0.4s ease both"}}>
-            <div style={S.sumCard}>
-              <span style={{fontSize:48,display:"block",marginBottom:12}}>🏆</span>
-              <h2 style={{fontSize:22,fontWeight:700,color:"#e8e0d4",marginBottom:20}}>Session Complete!</h2>
-              <div style={{display:"flex",justifyContent:"center",gap:28,marginBottom:28}}>
-                {[{v:sessionStats.reviewed,l:"Reviewed"},{v:sessionStats.correct,l:"Correct",c:"#48bb78"},{v:sessionStats.reviewed-sessionStats.correct,l:"To review",c:"#e53e3e"}].map((s,i)=>
-                  <div key={i} style={{display:"flex",flexDirection:"column",alignItems:"center"}}>
-                    <span style={{fontSize:28,fontWeight:700,fontFamily:"'Noto Serif SC', serif",color:s.c||"#c4a47c"}}>{s.v}</span>
-                    <span style={{fontSize:11,color:"#8a7e6e",marginTop:3,textTransform:"uppercase",letterSpacing:"0.05em"}}>{s.l}</span>
-                  </div>
-                )}
-              </div>
-              <div style={{display:"flex",gap:10,justifyContent:"center",flexWrap:"wrap"}}>
-                <button onClick={()=>setView("home")} style={S.startBtn}>Back to Home</button>
-                {getDueCards(cards).length>0&&<button onClick={startReview} style={{...S.startBtn,background:"rgba(196,164,124,0.15)",color:"#c4a47c"}}>Study More</button>}
-              </div>
-            </div>
-          </div>
-        )}
+    {vw==="summary"&&<div style={{display:"flex",justifyContent:"center",paddingTop:24,animation:"fu .4s ease both"}}><div style={{background:"#fff",borderRadius:14,padding:"32px 24px",textAlign:"center",maxWidth:360,width:"100%",border:"1px solid #f1f5f9"}}><span style={{fontSize:40,display:"block",marginBottom:8}}>🎉</span><h2 style={{fontSize:18,fontWeight:700,color:"#2d3748",marginBottom:4}}>Session Complete!</h2><div style={{display:"flex",alignItems:"center",justifyContent:"center",gap:3,marginBottom:16}}><span>🔥</span><span style={{fontSize:12,fontWeight:600,color:"#ea580c"}}>{streak.count} day streak</span></div><div style={{display:"flex",justifyContent:"center",gap:20,marginBottom:20}}>{[{v:st.r,l:"Reviewed",c:"#6366f1"},{v:st.c,l:"Correct",c:"#22c55e"},{v:st.r-st.c,l:"Retry",c:"#ef4444"}].map((s,i)=><div key={i}><span style={{fontSize:24,fontWeight:700,fontFamily:"'Noto Serif SC',serif",color:s.c,display:"block"}}>{s.v}</span><span style={{fontSize:9,color:"#94a3b8"}}>{s.l}</span></div>)}</div><button onClick={()=>setVw("home")} style={T.btn}>Home</button></div></div>}
 
-        {view==="progress"&&(
-          <div style={{animation:"fadeUp 0.4s ease both"}}>
-            <h2 style={S.secTitle}>Your Progress</h2>
-            <div style={S.statsGrid}>
-              {[{l:"Total Words",v:cards.length,i:"册"},{l:"Mastered",v:masteredCount,i:"✓",c:"#48bb78"},{l:"Learning",v:learningCount,i:"◑",c:"#f6ad55"},{l:"New",v:newCount,i:"●",c:"#e53e3e"},{l:"Reviews",v:totalReviews,i:"⟳"},{l:"Accuracy",v:`${accuracy}%`,i:"◎"}].map((s,i)=>
-                <div key={i} style={{...S.statCard,animationDelay:`${i*0.06}s`}}>
-                  <span style={{fontSize:18,color:s.c||"#c4a47c"}}>{s.i}</span>
-                  <span style={{fontSize:24,fontWeight:700,fontFamily:"'Noto Serif SC', serif",color:"#e8e0d4"}}>{s.v}</span>
-                  <span style={{fontSize:10,color:"#8a7e6e",textTransform:"uppercase",letterSpacing:"0.06em"}}>{s.l}</span>
-                </div>
-              )}
-            </div>
-            <h3 style={{...S.secTitle,fontSize:16,marginTop:28}}>By Category</h3>
-            <div style={{display:"flex",flexDirection:"column",gap:6}}>
-              {CATEGORIES.filter(c=>c!=="all").map(cat=>{
-                const cc=cards.filter(c=>c.category===cat);const m=cc.filter(c=>c.repetitions>=4).length;const pct=cc.length?Math.round((m/cc.length)*100):0;
-                return <div key={cat} style={S.wordRow}>
-                  <span style={{fontSize:18,width:30}}>{CATEGORY_ICONS[cat]}</span>
-                  <span style={{flex:1,fontSize:13,color:"#e8e0d4",textTransform:"capitalize"}}>{cat}</span>
-                  <div style={{width:80,height:6,borderRadius:3,background:"rgba(196,164,124,0.1)",overflow:"hidden"}}><div style={{height:"100%",width:`${pct}%`,background:"#48bb78",borderRadius:3,transition:"width 0.6s"}}/></div>
-                  <span style={{fontSize:11,color:"#8a7e6e",width:50,textAlign:"right"}}>{m}/{cc.length}</span>
-                </div>;
-              })}
-            </div>
-            <div style={{display:"flex",gap:10,marginTop:28}}>
-              <button onClick={resetProgress} style={{...S.resetBtn,flex:1}}>Reset Progress</button>
-              <button onClick={resetAll} style={{...S.resetBtn,flex:1,borderColor:"rgba(229,62,62,0.4)"}}>Reset All</button>
-            </div>
-          </div>
-        )}
+    {vw==="progress"&&<div style={{animation:"fu .4s ease both"}}><h2 style={T.sc}>Progress</h2><div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:6,marginBottom:14}}>{[{l:"Active",v:ac.length,c:"#6366f1"},{l:"Mastered",v:mst,c:"#8b5cf6"},{l:"Learning",v:lrn,c:"#eab308"},{l:"New",v:nwc,c:"#94a3b8"},{l:"Reviews",v:ttr,c:"#e07a5f"},{l:"Accuracy",v:`${acc2}%`,c:"#22c55e"}].map((s,i)=><div key={i} style={{background:"#fff",borderRadius:10,padding:"11px 4px",textAlign:"center",border:"1px solid #f1f5f9"}}><div style={{fontSize:18,fontWeight:700,fontFamily:"'Noto Serif SC',serif",color:s.c}}>{s.v}</div><div style={{fontSize:9,color:"#94a3b8",textTransform:"uppercase"}}>{s.l}</div></div>)}</div>
+      <div style={{background:"#fff",borderRadius:10,padding:12,border:"1px solid #f1f5f9",marginBottom:12}}><div style={{fontSize:11,fontWeight:600,color:"#2d3748",marginBottom:8}}>SRS Stages</div>{SL.map((l,i)=><div key={i} style={{display:"flex",alignItems:"center",gap:7,padding:"4px 0",borderBottom:i<6?"1px solid #f8fafc":"none"}}><span style={{width:8,height:8,borderRadius:2,background:SC[i]}}/><span style={{flex:1,fontSize:11,color:"#475569"}}>{["New","1 day","3 days","1 week","2 weeks","1 month","Mastered"][i]}</span><span style={{fontSize:11,fontWeight:600,color:"#2d3748",width:24,textAlign:"right"}}>{sdd[i]}</span></div>)}</div>
+      <div style={{background:"#fff",borderRadius:10,padding:12,border:"1px solid #f1f5f9"}}><div style={{fontSize:11,fontWeight:600,color:"#2d3748",marginBottom:8}}>By Chapter</div>{cw.length>0&&<div style={{display:"flex",alignItems:"center",gap:6,padding:"4px 0",borderBottom:"1px solid #f8fafc"}}><span style={{flex:1,fontSize:11,color:"#475569"}}>📝 My Class Words</span><span style={{fontSize:10,color:"#94a3b8"}}>{cw.filter(c=>c.rep>=6).length}/{cw.length}</span></div>}{imp.map(k=>{const d=DL.find(x=>x.key===k);if(!d)return null;const cc=cards.filter(c=>c.g===k);const m2=cc.filter(c=>c.rep>=6).length;const pct=cc.length?Math.round((m2/cc.length)*100):0;return <div key={k} style={{display:"flex",alignItems:"center",gap:6,padding:"4px 0"}}><span style={{flex:1,fontSize:11,color:"#475569"}}>Ch {d.ch} — {d.t} · D{d.d}</span><div style={{width:60,height:4,borderRadius:2,background:"#f1f5f9",overflow:"hidden"}}><div style={{height:"100%",width:`${pct}%`,background:"#8b5cf6",borderRadius:2}}/></div><span style={{fontSize:10,color:"#94a3b8",width:32,textAlign:"right"}}>{m2}/{cc.length}</span></div>;})}</div>
+    </div>}
 
-        {view==="words"&&(
-          <div style={{animation:"fadeUp 0.4s ease both"}}>
-            <h2 style={S.secTitle}>Word Library ({cards.length})</h2>
-            <input placeholder="Search hanzi, pinyin, or English..." value={searchTerm} onChange={e=>setSearchTerm(e.target.value)} style={{...S.input,marginBottom:12}}/>
-            {!searchTerm&&<div style={{...S.filterRow,marginBottom:12}}>
-              {CATEGORIES.map(cat=><button key={cat} onClick={()=>setFilter(cat)} style={{...S.chip,...(filter===cat?S.chipA:{}),fontSize:11,padding:"4px 10px"}}>
-                {cat!=="all"&&<span style={{marginRight:3}}>{CATEGORY_ICONS[cat]}</span>}{cat==="all"?"All":cat}
-              </button>)}
-            </div>}
-            <div style={S.wordList}>
-              {searchedWords.map(c=>{
-                const tot=c.correctCount+c.incorrectCount;const pct=tot?Math.round((c.correctCount/tot)*100):0;
-                const st=c.repetitions>=4?"mastered":c.repetitions>0?"learning":"new";
-                return <div key={c.id} style={S.wordRow}>
-                  <span style={S.wordH}>{c.hanzi}</span><span style={S.wordP}>{c.pinyin}</span><span style={S.wordE}>{c.english}</span>
-                  <span style={{...S.wordB,background:st==="mastered"?"#c6f6d520":st==="learning"?"#fefcbf20":"#fed7d720",color:st==="mastered"?"#48bb78":st==="learning"?"#d69e2e":"#e53e3e"}}>
-                    {st==="mastered"?"✓":st==="learning"?"◑":"●"} {tot?`${pct}%`:"—"}
-                  </span>
-                </div>;
-              })}
-            </div>
-            <div style={{marginTop:28,padding:16,background:"rgba(45,40,32,0.7)",border:"1px solid rgba(196,164,124,0.1)",borderRadius:14}}>
-              <h3 style={{fontSize:14,color:"#c4a47c",marginBottom:12}}>+ Add Custom Word</h3>
-              <div style={{display:"flex",flexDirection:"column",gap:8}}>
-                <input placeholder="汉字 (Hanzi)" value={newWord.hanzi} onChange={e=>setNewWord(p=>({...p,hanzi:e.target.value}))} style={{...S.input,fontFamily:"'Noto Serif SC', serif",fontSize:18}}/>
-                <input placeholder="Pīnyīn" value={newWord.pinyin} onChange={e=>setNewWord(p=>({...p,pinyin:e.target.value}))} style={S.input}/>
-                <input placeholder="English meaning" value={newWord.english} onChange={e=>setNewWord(p=>({...p,english:e.target.value}))} style={S.input}/>
-                <select value={newWord.category} onChange={e=>setNewWord(p=>({...p,category:e.target.value}))} style={{...S.input,color:"#e8e0d4"}}>
-                  {CATEGORIES.filter(c=>c!=="all").map(c=><option key={c} value={c}>{CATEGORY_ICONS[c]} {c}</option>)}
-                </select>
-                <button onClick={addWord} style={S.addBtn}>+ Add Word</button>
-              </div>
-            </div>
-          </div>
-        )}
-      </main>
-    </div>
-  );
+    {vw==="words"&&<div style={{animation:"fu .4s ease both"}}><h2 style={T.sc}>Words ({ac.length})</h2><input placeholder="Search..." value={sr} onChange={e=>setSr(e.target.value)} maxLength={100} style={{...T.ip,marginBottom:8}}/><div style={{display:"flex",flexDirection:"column",gap:2,overflowY:"auto"}}>{(sr?ac.filter(c=>c.h.includes(sr)||c.p.toLowerCase().includes(sr.toLowerCase())||c.e.toLowerCase().includes(sr.toLowerCase())):ac).map(c=>{const s2=gs(c.rep),d=DL.find(x=>x.key===c.g),isExp=expWord===c.id;return <div key={c.id} style={{borderRadius:7,background:isExp?"#f8fafc":"#fff",border:"1px solid "+(isExp?"#e2e8f0":"#f1f5f9"),overflow:"hidden"}}><div onClick={()=>{if(isExp){setExpWord(null);setEditStg(null);}else{setExpWord(c.id);setEditW({h:c.h,p:c.p,e:c.e});setEditStg(null);}}} style={{display:"flex",alignItems:"center",gap:5,padding:"6px 10px",cursor:"pointer",minHeight:32}}><span style={{fontFamily:"'Noto Serif SC',serif",fontSize:15,fontWeight:700,color:"#2d3748",minWidth:40,display:"flex",alignItems:"center"}}>{c.h}</span><span style={{fontSize:11,color:"#e07a5f",fontStyle:"italic",minWidth:60,display:"flex",alignItems:"center"}}>{c.p}</span><span style={{fontSize:11,color:"#64748b",flex:1,display:"flex",alignItems:"center"}}>{c.e}</span><span style={{fontSize:9,color:"#a0aec0",display:"flex",alignItems:"center"}}>{d?`Ch${d.ch}·D${d.d}`:c.g==="class"?"📝":""}</span><span style={{width:8,height:8,borderRadius:2,background:SC[s2],flexShrink:0}}/></div>
+{isExp&&<div style={{padding:"8px 10px 10px",borderTop:"1px solid #e2e8f0",animation:"fu .2s ease both"}}>
+<div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:8}}>
+<div><div style={{display:"flex",gap:12,marginBottom:4,fontSize:10}}><div><span style={{color:"#94a3b8"}}>Due: </span><span style={{fontWeight:600,color:c.rep>=6?"#8b5cf6":c.nr<=Date.now()?"#e07a5f":"#475569"}}>{fmtDue(c)}</span></div><div><span style={{color:"#94a3b8"}}>Last: </span><span style={{color:"#475569"}}>{fmtAgo(c.lr)}</span></div></div>
+<div style={{display:"flex",gap:12,fontSize:10}}><div><span style={{color:"#22c55e"}}>✓ {c.cc}</span><span style={{color:"#94a3b8"}}> correct</span></div><div><span style={{color:"#ef4444"}}>✕ {c.ic}</span><span style={{color:"#94a3b8"}}> incorrect</span></div></div></div>
+<div style={{display:"flex",gap:2,flexWrap:"wrap",justifyContent:"flex-end",maxWidth:200}}>{[["New",0],["1d",1],["3d",2],["1w",3],["2w",4],["1m",5],["M",6]].map(([l,i])=>{const active=editStg!==null?editStg===i:s2===i;return <button key={i} onClick={e=>{e.stopPropagation();setEditStg(i);}} style={{padding:"2px 5px",fontSize:8,borderRadius:4,border:"1px solid "+(active?SC[i]+"80":"#e2e8f0"),background:active?SC[i]+"20":"#fff",color:active?SC[i]:"#94a3b8",cursor:"pointer",fontFamily:"inherit",fontWeight:active?700:400,lineHeight:"14px"}}>{l}</button>;})}</div>
+</div>
+<div style={{display:"flex",gap:6,alignItems:"flex-end",marginTop:8}}><div style={{flex:1}}><div style={{fontSize:9,color:"#94a3b8",marginBottom:2}}>Hanzi</div><input value={editW.h} onChange={e=>setEditW(w=>({...w,h:e.target.value}))} maxLength={MAX_FIELD} style={{...T.ip,padding:"4px 8px",fontSize:11,width:"100%",fontFamily:"'Noto Serif SC',serif"}}/></div><div style={{flex:1}}><div style={{fontSize:9,color:"#94a3b8",marginBottom:2}}>Pinyin</div><input value={editW.p} onChange={e=>setEditW(w=>({...w,p:e.target.value}))} maxLength={MAX_FIELD} style={{...T.ip,padding:"4px 8px",fontSize:11,width:"100%"}}/></div><div style={{flex:1}}><div style={{fontSize:9,color:"#94a3b8",marginBottom:2}}>English</div><input value={editW.e} onChange={e=>setEditW(w=>({...w,e:e.target.value}))} maxLength={MAX_FIELD} style={{...T.ip,padding:"4px 8px",fontSize:11,width:"100%"}}/></div><button onClick={()=>saveWordEdit(c.id)} style={{padding:"4px 12px",fontSize:10,fontWeight:600,borderRadius:6,border:"1px solid #e07a5f40",background:"#e07a5f10",color:"#e07a5f",cursor:"pointer",fontFamily:"inherit",whiteSpace:"nowrap"}}>Save</button></div>
+</div>}
+</div>;})}</div></div>}
+
+    </main></div>);
 }
 
-const S = {
-  app:{fontFamily:"'DM Sans', sans-serif",minHeight:"100vh",background:"linear-gradient(165deg, #1a1714 0%, #2d2820 40%, #1f1c17 100%)",color:"#e8e0d4",position:"relative",overflow:"hidden"},
-  bgD1:{position:"fixed",top:-200,right:-200,width:500,height:500,borderRadius:"50%",background:"radial-gradient(circle, rgba(196,164,124,0.06) 0%, transparent 70%)",pointerEvents:"none"},
-  bgD2:{position:"fixed",bottom:-150,left:-150,width:400,height:400,borderRadius:"50%",background:"radial-gradient(circle, rgba(196,164,124,0.04) 0%, transparent 70%)",pointerEvents:"none"},
-  header:{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"14px 20px",borderBottom:"1px solid rgba(196,164,124,0.12)",backdropFilter:"blur(12px)",position:"sticky",top:0,zIndex:10,background:"rgba(26,23,20,0.85)"},
-  headerLeft:{display:"flex",alignItems:"center",gap:10,cursor:"pointer"},
-  logo:{fontFamily:"'Noto Serif SC', serif",fontSize:28,fontWeight:900,color:"#c4a47c",lineHeight:1},
-  title:{fontSize:18,fontWeight:700,letterSpacing:"0.02em",color:"#e8e0d4",lineHeight:1.2},
-  subtitle:{fontSize:10,color:"#8a7e6e",letterSpacing:"0.1em",textTransform:"uppercase"},
-  nav:{display:"flex",gap:2},
-  navBtn:{background:"transparent",border:"none",color:"#8a7e6e",padding:"7px 12px",borderRadius:8,cursor:"pointer",fontSize:12,fontWeight:500,fontFamily:"'DM Sans', sans-serif",display:"flex",alignItems:"center",gap:5,transition:"all 0.2s"},
-  navBtnA:{background:"rgba(196,164,124,0.12)",color:"#c4a47c"},
-  navI:{fontSize:13},
-  main:{maxWidth:640,margin:"0 auto",padding:"20px 16px 60px"},
-  heroStats:{display:"flex",justifyContent:"center",alignItems:"center",gap:24,marginBottom:20,padding:"20px 0"},
-  heroBox:{display:"flex",flexDirection:"column",alignItems:"center"},
-  heroNum:{fontSize:34,fontWeight:700,color:"#c4a47c",fontFamily:"'Noto Serif SC', serif",lineHeight:1},
-  heroLbl:{fontSize:11,color:"#8a7e6e",marginTop:5,letterSpacing:"0.05em",textTransform:"uppercase"},
-  heroDiv:{width:1,height:32,background:"rgba(196,164,124,0.2)"},
-  filterRow:{display:"flex",flexWrap:"wrap",gap:5,justifyContent:"center",marginBottom:8},
-  chip:{background:"rgba(196,164,124,0.06)",border:"1px solid rgba(196,164,124,0.12)",borderRadius:20,padding:"5px 12px",fontSize:11,color:"#8a7e6e",cursor:"pointer",fontFamily:"'DM Sans', sans-serif",transition:"all 0.2s",textTransform:"capitalize",display:"flex",alignItems:"center"},
-  chipA:{background:"rgba(196,164,124,0.18)",borderColor:"#c4a47c",color:"#c4a47c"},
-  startBtn:{background:"linear-gradient(135deg, #c4a47c, #a8895f)",border:"none",borderRadius:12,padding:"14px 40px",fontSize:15,fontWeight:700,color:"#1a1714",cursor:"pointer",fontFamily:"'DM Sans', sans-serif",letterSpacing:"0.02em",transition:"all 0.2s",boxShadow:"0 4px 20px rgba(196,164,124,0.25)",display:"block",width:"100%",textAlign:"center"},
-  startDis:{background:"rgba(196,164,124,0.15)",color:"#8a7e6e",cursor:"default",boxShadow:"none"},
-  pBars:{marginBottom:4},
-  pLabel:{display:"flex",alignItems:"center",gap:14,fontSize:11,color:"#8a7e6e",marginBottom:6},
-  pTrack:{display:"flex",height:6,borderRadius:3,background:"rgba(196,164,124,0.08)",overflow:"hidden"},
-  pFill:{height:"100%",transition:"width 0.6s ease"},
-  revHead:{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16},
-  exitBtn:{background:"transparent",border:"1px solid rgba(196,164,124,0.15)",borderRadius:8,padding:"5px 12px",fontSize:12,color:"#8a7e6e",cursor:"pointer",fontFamily:"'DM Sans', sans-serif"},
-  card:{background:"linear-gradient(160deg, rgba(45,40,32,0.9), rgba(35,30,23,0.95))",border:"1px solid rgba(196,164,124,0.15)",borderRadius:20,padding:"36px 28px",textAlign:"center",minHeight:300,display:"flex",flexDirection:"column",justifyContent:"center",alignItems:"center",position:"relative",boxShadow:"0 8px 40px rgba(0,0,0,0.3), inset 0 1px 0 rgba(196,164,124,0.08)"},
-  cardCat:{position:"absolute",top:14,left:18,fontSize:11,color:"#8a7e6e",textTransform:"capitalize",letterSpacing:"0.05em"},
-  hanzi:{fontFamily:"'Noto Serif SC', serif",fontSize:64,fontWeight:900,color:"#e8e0d4",lineHeight:1.1,animation:"float 4s ease-in-out infinite"},
-  pinyin:{fontSize:17,color:"#c4a47c",fontStyle:"italic",letterSpacing:"0.05em"},
-  hintBtn:{background:"rgba(196,164,124,0.08)",border:"1px solid rgba(196,164,124,0.15)",borderRadius:8,padding:"5px 14px",fontSize:12,color:"#8a7e6e",cursor:"pointer",fontFamily:"'DM Sans', sans-serif",marginTop:8},
-  ratingRow:{display:"flex",gap:7,marginTop:20,justifyContent:"center",animation:"fadeUp 0.3s ease both"},
-  rateBtn:{flex:1,padding:"12px 6px",borderRadius:12,border:"none",cursor:"pointer",fontFamily:"'DM Sans', sans-serif",fontSize:12,fontWeight:600,display:"flex",flexDirection:"column",alignItems:"center",gap:3,transition:"all 0.2s"},
-  rA:{background:"rgba(229,62,62,0.12)",color:"#e53e3e"},
-  rH:{background:"rgba(214,158,46,0.12)",color:"#d69e2e"},
-  rG:{background:"rgba(72,187,120,0.12)",color:"#48bb78"},
-  rE:{background:"rgba(99,179,237,0.12)",color:"#63b3ed"},
-  sumCard:{background:"rgba(45,40,32,0.9)",border:"1px solid rgba(196,164,124,0.15)",borderRadius:20,padding:"40px 32px",textAlign:"center",maxWidth:400,width:"100%"},
-  secTitle:{fontSize:20,fontWeight:700,marginBottom:16,color:"#e8e0d4"},
-  statsGrid:{display:"grid",gridTemplateColumns:"repeat(3, 1fr)",gap:8},
-  statCard:{background:"rgba(45,40,32,0.7)",border:"1px solid rgba(196,164,124,0.1)",borderRadius:12,padding:"16px 10px",textAlign:"center",display:"flex",flexDirection:"column",alignItems:"center",gap:3,animation:"fadeUp 0.4s ease both"},
-  wordList:{display:"flex",flexDirection:"column",gap:3,maxHeight:500,overflowY:"auto"},
-  wordRow:{display:"flex",alignItems:"center",gap:10,padding:"8px 12px",borderRadius:8,background:"rgba(45,40,32,0.5)",border:"1px solid rgba(196,164,124,0.06)"},
-  wordH:{fontFamily:"'Noto Serif SC', serif",fontSize:18,fontWeight:700,color:"#e8e0d4",minWidth:52},
-  wordP:{fontSize:12,color:"#c4a47c",fontStyle:"italic",minWidth:75},
-  wordE:{fontSize:12,color:"#8a7e6e",flex:1},
-  wordB:{fontSize:10,padding:"2px 8px",borderRadius:10,fontWeight:600,whiteSpace:"nowrap"},
-  input:{background:"rgba(26,23,20,0.6)",border:"1px solid rgba(196,164,124,0.15)",borderRadius:10,padding:"10px 14px",fontSize:13,color:"#e8e0d4",fontFamily:"'DM Sans', sans-serif",outline:"none",width:"100%"},
-  addBtn:{background:"rgba(196,164,124,0.15)",border:"1px solid rgba(196,164,124,0.25)",borderRadius:10,padding:"10px",fontSize:13,fontWeight:600,color:"#c4a47c",cursor:"pointer",fontFamily:"'DM Sans', sans-serif"},
-  resetBtn:{background:"transparent",border:"1px solid rgba(229,62,62,0.25)",borderRadius:10,padding:"10px 16px",fontSize:12,color:"#e53e3e",cursor:"pointer",fontFamily:"'DM Sans', sans-serif"},
-};
+const CSS=`@import url('https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@400;700;900&family=DM+Sans:ital,wght@0,400;0,500;0,700;1,400&display=swap');*{box-sizing:border-box;margin:0;padding:0}@keyframes fu{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}@keyframes pop{0%{transform:scale(1)}50%{transform:scale(1.015);box-shadow:0 0 20px rgba(34,197,94,0.12)}100%{transform:scale(1)}}@keyframes shk{0%,100%{transform:translateX(0)}25%{transform:translateX(-4px)}50%{transform:translateX(4px)}75%{transform:translateX(-2px)}}input::placeholder{color:#cbd5e1}::-webkit-scrollbar{width:4px}::-webkit-scrollbar-thumb{background:#e2e8f0;border-radius:2px}`;
+const T={app:{fontFamily:"'DM Sans',sans-serif",minHeight:"100vh",background:"#f8fafc",color:"#2d3748"},hdr:{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"9px 12px",background:"#fff",borderBottom:"1px solid #f1f5f9",position:"sticky",top:0,zIndex:10},nb:{background:"transparent",border:"none",color:"#94a3b8",padding:"4px 8px",borderRadius:6,cursor:"pointer",fontSize:10,fontWeight:500,fontFamily:"inherit"},nba:{background:"#f1f5f9",color:"#475569"},main:{maxWidth:500,margin:"0 auto",padding:"12px 12px 50px"},btn:{background:"#e07a5f",border:"none",borderRadius:11,padding:"12px 16px",fontSize:14,fontWeight:700,color:"#fff",cursor:"pointer",fontFamily:"inherit",width:"100%",textAlign:"center",boxShadow:"0 2px 8px rgba(224,122,95,0.2)"},bd:{background:"#e2e8f0",color:"#94a3b8",cursor:"default",boxShadow:"none"},ch:{background:"#fff",border:"1px solid #e2e8f0",borderRadius:16,padding:"3px 9px",fontSize:10,color:"#64748b",cursor:"pointer",fontFamily:"inherit",display:"flex",alignItems:"center"},cha:{background:"#e07a5f10",borderColor:"#e07a5f",color:"#e07a5f"},cd:{background:"#fff",border:"2px solid #f1f5f9",borderRadius:16,padding:"26px 20px",textAlign:"center",minHeight:240,display:"flex",flexDirection:"column",justifyContent:"center",alignItems:"center",boxShadow:"0 1px 12px rgba(0,0,0,0.03)",transition:"border-color .3s"},ip:{background:"#f8fafc",border:"1px solid #e2e8f0",borderRadius:9,padding:"8px 11px",fontSize:12,color:"#2d3748",fontFamily:"inherit",outline:"none",width:"100%"},sc:{fontSize:15,fontWeight:700,marginBottom:10,color:"#2d3748"},fb:{display:"flex",alignItems:"center",justifyContent:"space-between",width:"100%",padding:"9px 12px",background:"none",border:"none",borderBottom:"1px solid #f8fafc",cursor:"pointer",fontFamily:"inherit",fontSize:13,fontWeight:500,color:"#475569",gap:6,transition:"background .15s"}};
