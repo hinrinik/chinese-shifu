@@ -1,11 +1,13 @@
 import { useState, useEffect, useRef } from "react";
 import { initializeApp } from "firebase/app";
 import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged } from "firebase/auth";
-import { getFirestore, doc, getDoc, setDoc } from "firebase/firestore";
+import { initializeFirestore, doc, getDoc, setDoc } from "firebase/firestore";
 import { BOOK1_WORDS, BOOK1_DIALOGUES, BOOK1_CH_TITLES } from "./book1-vocabulary.js";
 
 const firebaseConfig = {apiKey:"AIzaSyB_3Mk9PwDV8bse39j9eAZ1ObADU22Ri1I",authDomain:"chinese-shufu.firebaseapp.com",projectId:"chinese-shufu",storageBucket:"chinese-shufu.firebasestorage.app",messagingSenderId:"514368919622",appId:"1:514368919622:web:268230647169821359d247",measurementId:"G-SEZLYZHVFT"};
-const app=initializeApp(firebaseConfig);const auth=getAuth(app);const db=getFirestore(app);const gProv=new GoogleAuthProvider();
+// Safari (especially Private Browsing) can block Firestore's default streaming transport;
+// auto-detect and fall back to long-polling so sync doesn't silently fail there.
+const app=initializeApp(firebaseConfig);const auth=getAuth(app);const db=initializeFirestore(app,{experimentalAutoDetectLongPolling:true});const gProv=new GoogleAuthProvider();
 
 const AW=[
 // Book 1 — Chapters 1-10
