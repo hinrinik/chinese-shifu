@@ -70,6 +70,29 @@ const valSrs=c=>({id:Number(c.id)||0,rep:Math.max(0,Math.min(6,Math.floor(Number
 async function sv(uid,d){try{const safe={imported:(d.imported||[]).filter(k=>typeof k==="string").map(san),srs:(d.srs||[]).map(valSrs),classWords:(d.classWords||[]).map(c=>({id:Number(c.id)||0,h:san(c.h),p:san(c.p),e:san(c.e),g:san(c.g)})),streak:{count:Math.max(0,Math.floor(Number(d.streak?.count)||0)),last:typeof d.streak?.last==="string"?d.streak.last.slice(0,10):null},dailyReviews:{date:typeof d.dailyReviews?.date==="string"?d.dailyReviews.date.slice(0,10):null,count:Math.max(0,Math.floor(Number(d.dailyReviews?.count)||0))},updatedAt:Date.now()};await setDoc(doc(db,"users",uid),safe);}catch(e){console.error(e);}}
 async function ld(uid){try{const s=await getDoc(doc(db,"users",uid));if(s.exists())return s.data();}catch(e){console.error(e);}return null;}
 
+// Per-card merge so two devices' progress combines instead of one overwriting the other.
+// `lr` (last reviewed) is the tiebreaker: whichever side most recently reviewed a card wins for that card.
+const mergeSrsArr=(local,remote)=>{const m={};(remote||[]).forEach(c=>{m[c.id]=c;});(local||[]).forEach(c=>{const r=m[c.id];if(!r||(c.lr||0)>=(r.lr||0))m[c.id]=c;});return Object.values(m);};
+const mergeClassWords=(local,remote)=>{const m={};(remote||[]).forEach(c=>{m[c.id]=c;});(local||[]).forEach(c=>{m[c.id]=c;});return Object.values(m);};
+const mergeStreak=(local,remote)=>{if(!remote)return local;if(!local)return remote;return(local.last||"")>=(remote.last||"")?local:remote;};
+const mergeDRev=(local,remote)=>{if(!remote)return local;if(!local)return remote;return(local.date||"")>=(remote.date||"")?local:remote;};
+const mergePayload=(local,remote)=>{if(!remote)return local;return{imported:Array.from(new Set([...(local.imported||[]),...(remote.imported||[])])),srs:mergeSrsArr(local.srs,remote.srs),classWords:mergeClassWords(local.classWords,remote.classWords),streak:mergeStreak(local.streak,remote.streak),dailyReviews:mergeDRev(local.dailyReviews,remote.dailyReviews)};};
+
+// Grandfather-father-son recovery snapshots: users/{uid}/snapshots/{daily,weekly,monthly}.
+// Rotated opportunistically on app load — no backend/Cloud Function needed.
+async function ldSnap(uid,slot){try{const s=await getDoc(doc(db,"users",uid,"snapshots",slot));if(s.exists())return s.data();}catch(e){console.error(e);}return null;}
+async function writeSnapDoc(uid,slot,snap){try{await setDoc(doc(db,"users",uid,"snapshots",slot),snap);}catch(e){console.error(e);}}
+async function rotateSnapshots(uid,payload){
+  if(!payload)return;
+  try{
+    const[monthly,weekly,daily]=await Promise.all([ldSnap(uid,"monthly"),ldSnap(uid,"weekly"),ldSnap(uid,"daily")]);
+    // Promote oldest tier first, using each slot's pre-rotation content, so a fresher write below doesn't clobber the value being promoted.
+    if(weekly&&(!monthly||Date.now()-monthly.savedAt>30*DAY))await writeSnapDoc(uid,"monthly",weekly);
+    if(daily&&(!weekly||Date.now()-weekly.savedAt>7*DAY))await writeSnapDoc(uid,"weekly",daily);
+    if(!daily||Date.now()-daily.savedAt>DAY)await writeSnapDoc(uid,"daily",{data:payload,savedAt:Date.now()});
+  }catch(e){console.error(e);}
+}
+
 function Fold({label,badge,children,defaultOpen=false}){
   const[o,sO]=useState(defaultOpen);
   return<div style={{marginBottom:1}}><button onClick={()=>sO(!o)} style={{display:"flex",alignItems:"center",width:"100%",padding:"10px 12px",background:"none",border:"none",cursor:"pointer",fontFamily:"inherit",fontSize:13,fontWeight:600,color:"#2d3748",gap:8}}><span style={{fontSize:10,color:"#a0aec0",transition:"transform .2s",transform:o?"rotate(90deg)":"rotate(0deg)"}}>▶</span><span style={{flex:1,textAlign:"left"}}>{label}</span>{badge!==undefined&&<span style={{fontSize:10,color:"#94a3b8",fontWeight:400}}>{badge}</span>}</button>{o&&<div style={{paddingLeft:12}}>{children}</div>}</div>;
@@ -86,8 +109,36 @@ export default function App(){
 
   useEffect(()=>{const u=onAuthStateChanged(auth,u=>{setUser(u);setAL(false);});return u;},[]);
   const restoreFromData=(data)=>{const il=data.imported||[];setImp(il);const sm={};(data.srs||[]).forEach(s=>{sm[s.id]=s;});setCards(AW.filter(w=>il.includes(w.g)).map(w=>{const s=sm[w.id];return s?{...w,...s}:ic(w);}));setCw((data.classWords||[]).map(w=>{const s=sm[w.id];return s?{...w,...s}:w;}));setStreak(data.streak||{count:0,last:null});setDRev(data.dailyReviews||{date:null,count:0});};
-  useEffect(()=>{if(!user){setCloudOk(false);loadedRef.current=false;return;}ld(user.uid).then(data=>{const hasData=data&&((data.srs||[]).length>0||(data.imported||[]).length>0);if(hasData){prevDataRef.current=data;hadDataRef.current=true;restoreFromData(data);try{localStorage.setItem("shifu_backup_"+user.uid,JSON.stringify(data));}catch(e){}}else{let backup=null;try{const raw=localStorage.getItem("shifu_backup_"+user.uid);if(raw)backup=JSON.parse(raw);}catch(e){}const backupHasData=backup&&((backup.srs||[]).length>0||(backup.imported||[]).length>0);if(backupHasData){prevDataRef.current=backup;hadDataRef.current=true;restoreFromData(backup);console.warn("Restored from local backup — cloud was empty");}else{hadDataRef.current=false;}}loadedRef.current=true;setCloudOk(true);});},[user]);
-  useEffect(()=>{if(!user||!cloudOk||!loadedRef.current)return;const newSrsCount=[...cards,...cw].length;const newImpCount=imp.length;if(hadDataRef.current&&newSrsCount===0&&newImpCount===0){console.error("Save blocked: would erase all data (had data before)");return;}setSaving(true);const t=setTimeout(()=>{const srs=[...cards,...cw].map(c=>({id:c.id,rep:c.rep,ef:c.ef,nr:c.nr,lr:c.lr,cc:c.cc,ic:c.ic}));const payload={imported:imp,srs,classWords:cw.map(c=>({id:c.id,h:c.h,p:c.p,e:c.e,g:c.g})),streak,dailyReviews:dRev};prevDataRef.current=payload;hadDataRef.current=srs.length>0||imp.length>0;sv(user.uid,payload).then(()=>setSaving(false));try{localStorage.setItem("shifu_backup_"+user.uid,JSON.stringify(payload));}catch(e){}},2000);return()=>clearTimeout(t);},[cards,cw,imp,streak,dRev,user,cloudOk]);
+  useEffect(()=>{if(!user){setCloudOk(false);loadedRef.current=false;return;}ld(user.uid).then(data=>{const hasData=data&&((data.srs||[]).length>0||(data.imported||[]).length>0);if(hasData){prevDataRef.current=data;hadDataRef.current=true;restoreFromData(data);try{localStorage.setItem("shifu_backup_"+user.uid,JSON.stringify(data));}catch(e){}rotateSnapshots(user.uid,data);}else{let backup=null;try{const raw=localStorage.getItem("shifu_backup_"+user.uid);if(raw)backup=JSON.parse(raw);}catch(e){}const backupHasData=backup&&((backup.srs||[]).length>0||(backup.imported||[]).length>0);if(backupHasData){prevDataRef.current=backup;hadDataRef.current=true;restoreFromData(backup);console.warn("Restored from local backup — cloud was empty");rotateSnapshots(user.uid,backup);}else{hadDataRef.current=false;}}loadedRef.current=true;setCloudOk(true);});},[user]);
+  useEffect(()=>{
+    if(!user||!cloudOk||!loadedRef.current)return;
+    const newSrsCount=[...cards,...cw].length;const newImpCount=imp.length;
+    if(hadDataRef.current&&newSrsCount===0&&newImpCount===0){console.error("Save blocked: would erase all data (had data before)");return;}
+    const localPayload={imported:imp,srs:[...cards,...cw].map(c=>({id:c.id,rep:c.rep,ef:c.ef,nr:c.nr,lr:c.lr,cc:c.cc,ic:c.ic})),classWords:cw.map(c=>({id:c.id,h:c.h,p:c.p,e:c.e,g:c.g})),streak,dailyReviews:dRev};
+    // Write the local backup immediately, independent of the network debounce below —
+    // if the tab dies before the 2s timer (or the visibilitychange flush) completes, this copy survives.
+    try{localStorage.setItem("shifu_backup_"+user.uid,JSON.stringify(localPayload));}catch{/* ignore quota/private-mode errors */}
+    setSaving(true);
+    let flushed=false;
+    const flush=()=>{
+      if(flushed)return;flushed=true;
+      ld(user.uid).then(remote=>{
+        const merged=mergePayload(localPayload,remote);
+        prevDataRef.current=merged;
+        hadDataRef.current=merged.srs.length>0||merged.imported.length>0;
+        // If the merge pulled in anything the other device saved that we don't have locally, reflect it in the UI too.
+        const changed=merged.srs.length!==localPayload.srs.length||merged.classWords.length!==localPayload.classWords.length||merged.imported.length!==localPayload.imported.length||merged.srs.some(c=>{const lc=localPayload.srs.find(x=>x.id===c.id);return!lc||lc.lr!==c.lr;});
+        if(changed){restoreFromData(merged);try{localStorage.setItem("shifu_backup_"+user.uid,JSON.stringify(merged));}catch{/* ignore quota/private-mode errors */}}
+        return sv(user.uid,merged);
+      }).finally(()=>setSaving(false));
+    };
+    const t=setTimeout(flush,2000);
+    const onHide=()=>{if(document.visibilityState==="hidden"){clearTimeout(t);flush();}};
+    const onPageHide=()=>{clearTimeout(t);flush();};
+    document.addEventListener("visibilitychange",onHide);
+    window.addEventListener("pagehide",onPageHide);
+    return()=>{clearTimeout(t);document.removeEventListener("visibilitychange",onHide);window.removeEventListener("pagehide",onPageHide);};
+  },[cards,cw,imp,streak,dRev,user,cloudOk]);
 
   const uStreak=(newDRevCount,updatedCards,updatedCw)=>{const today=td();setStreak(p=>{if(p.last===today)return p;const allCards=[...updatedCards,...updatedCw];const dueLeft=gd(allCards).length;if(newDRevCount>=10||dueLeft===0){const y=new Date(Date.now()-DAY).toISOString().slice(0,10);return p.last===y?{count:p.count+1,last:today}:{count:1,last:today};}return p;});};
   const sIn=async()=>{try{await signInWithPopup(auth,gProv);}catch(e){console.error(e);}};
