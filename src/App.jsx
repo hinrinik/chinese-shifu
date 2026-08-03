@@ -84,12 +84,15 @@ async function ldSnap(uid,slot){try{const s=await getDoc(doc(db,"users",uid,"sna
 async function writeSnapDoc(uid,slot,snap){try{await setDoc(doc(db,"users",uid,"snapshots",slot),snap);}catch(e){console.error(e);}}
 async function rotateSnapshots(uid,payload){
   if(!payload)return;
+  // Strip to exactly the 5 fields firestore.rules permits inside a snapshot — the raw loaded
+  // doc (or localStorage backup) also carries `updatedAt`, which the rules reject as an extra key.
+  const clean={imported:payload.imported||[],srs:payload.srs||[],classWords:payload.classWords||[],streak:payload.streak||{count:0,last:null},dailyReviews:payload.dailyReviews||{date:null,count:0}};
   try{
     const[monthly,weekly,daily]=await Promise.all([ldSnap(uid,"monthly"),ldSnap(uid,"weekly"),ldSnap(uid,"daily")]);
     // Promote oldest tier first, using each slot's pre-rotation content, so a fresher write below doesn't clobber the value being promoted.
     if(weekly&&(!monthly||Date.now()-monthly.savedAt>30*DAY))await writeSnapDoc(uid,"monthly",weekly);
     if(daily&&(!weekly||Date.now()-weekly.savedAt>7*DAY))await writeSnapDoc(uid,"weekly",daily);
-    if(!daily||Date.now()-daily.savedAt>DAY)await writeSnapDoc(uid,"daily",{data:payload,savedAt:Date.now()});
+    if(!daily||Date.now()-daily.savedAt>DAY)await writeSnapDoc(uid,"daily",{data:clean,savedAt:Date.now()});
   }catch(e){console.error(e);}
 }
 
