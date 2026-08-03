@@ -69,6 +69,22 @@ const dueIn=days=>days===0?Date.now()+3e5:startOfDay(Date.now())+days*DAY;
 const shuffle=a=>{const s=[...a];for(let i=s.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[s[i],s[j]]=[s[j],s[i]];}return s;};
 const fmtAgo=ts=>{if(!ts)return"Never";const d=Math.floor((Date.now()-ts)/DAY);if(d===0)return"Today";if(d===1)return"Yesterday";return`${d} days ago`;};
 const fmtDue=c=>{if(c.rep>=6)return"Mastered";const todayStart=startOfDay(Date.now());const dueDay=startOfDay(c.nr);if(dueDay<=todayStart)return"Due now";const d=Math.round((dueDay-todayStart)/DAY);if(d===1)return"Due tomorrow";return`Due in ${d} days`;};
+// Re-date the overdue backlog: within each SRS stage, deal that stage's overdue cards evenly
+// across the days of its own interval (1d→tomorrow, 2w→days 1-14, 1m→days 1-30, Mastered→1-60),
+// so a pile-up of due cards becomes a steady daily load instead of a wall. New cards (rep===0,
+// no interval to spread across) and cards already scheduled in the future are left untouched.
+// `lr` is back-derived from the new due date (nr - stage interval = the review time that
+// schedule implies) and clamped to strictly exceed the old `lr` — this makes the reshuffle win
+// the cross-device merge tiebreaker in mergeSrsArr instead of getting reverted by a stale device.
+const reshuffleOverdue=list=>{
+  const t0=startOfDay(Date.now()),eod=t0+DAY,byStage={},out={};
+  list.forEach(c=>{if(c.rep>0&&c.nr<eod){const s=gs(c.rep);(byStage[s]=byStage[s]||[]).push(c);}});
+  Object.keys(byStage).forEach(s=>{const span=SD[s];shuffle(byStage[s]).forEach((c,i)=>{
+    const nr=t0+(1+(i%span))*DAY;
+    out[c.id]={nr,lr:Math.max(nr-span*DAY,(c.lr||0)+1)};
+  });});
+  return out;
+};
 const MAX_FIELD=200,MAX_CSV_ROWS=500,MAX_CSV_FILE=512*1024;
 const san=s=>typeof s==="string"?s.slice(0,MAX_FIELD):"";
 const valSrs=c=>({id:Number(c.id)||0,rep:Math.max(0,Math.min(6,Math.floor(Number(c.rep)||0))),ef:Number(c.ef)||2.5,nr:typeof c.nr==="number"&&c.nr>0?c.nr:Date.now(),lr:typeof c.lr==="number"&&c.lr>0?c.lr:null,cc:Math.max(0,Math.floor(Number(c.cc)||0)),ic:Math.max(0,Math.floor(Number(c.ic)||0))});
@@ -112,6 +128,7 @@ export default function App(){
   const[streak,setStreak]=useState({count:0,last:null});const[dRev,setDRev]=useState({date:null,count:0});const[cloudOk,setCloudOk]=useState(false);const[saving,setSaving]=useState(false);
   const[vw,setVw]=useState("home");const[cur,setCur]=useState(null);const[fl,setFl]=useState(false);const[ft,setFt]=useState("all");
   const[st,setSt]=useState({r:0,c:0});const[sp,setSp]=useState(false);const[an,setAn]=useState("");const[sr,setSr]=useState("");const[expWord,setExpWord]=useState(null);const[editW,setEditW]=useState({h:"",p:"",e:""});const[editStg,setEditStg]=useState(null);const[qd,setQd]=useState("py");const[showSett,setShowSett]=useState(false);const[csvPv,setCsvPv]=useState(null);
+  const[reshAsk,setReshAsk]=useState(false);const[reshN,setReshN]=useState(0);
   const[mc,setMc]=useState(20);const[qu,setQu]=useState([]);const[md,setMd]=useState("flashcard");
   const[ty,setTy]=useState("");const[tr2,setTr2]=useState(null);const[nw,setNw]=useState({h:"",p:"",e:""});const rf=useRef(null);const loadedRef=useRef(false);const prevDataRef=useRef(null);const hadDataRef=useRef(false);
 
@@ -157,6 +174,7 @@ export default function App(){
   const addCw=()=>{if(!nw.h||!nw.e)return;const id=2000+Date.now()%1e6;setCw(p=>[...p,{...ic({id,h:san(nw.h),p:san(nw.p),e:san(nw.e),g:"class"})}]);setNw({h:"",p:"",e:""});};
   const parseCsv=f=>{if(f.size>MAX_CSV_FILE){alert("File too large (max 512 KB)");return;}const r=new FileReader();r.onload=e=>{const txt=e.target.result.trim();if(!txt)return;const sep=txt.includes("\t")?"\t":",";const rows=txt.split(/\r?\n/).slice(0,MAX_CSV_ROWS+1).map(l=>l.split(sep).map(c=>san(c.trim().replace(/^["']|["']$/g,""))));let data=rows;if(data.length>1&&/^(hanzi|chinese|汉字)/i.test(data[0][0]))data=data.slice(1);data=data.slice(0,MAX_CSV_ROWS);const words=data.filter(r=>r.length>=2&&r[0]).map(r=>({h:r[0],p:r.length>=3?r[1]:"",e:r.length>=3?r[2]:r[1]}));if(words.length)setCsvPv(words);};r.readAsText(f);};
   const confirmCsv=()=>{if(!csvPv)return;const base=2000+Date.now()%1e6;const nws=csvPv.map((w,i)=>ic({id:base+i,h:san(w.h),p:san(w.p),e:san(w.e),g:"class"}));setCw(p=>[...p,...nws]);setCsvPv(null);};
+  const doReshuffle=()=>{const m=reshuffleOverdue([...cards,...cw]);const up=p=>p.map(c=>m[c.id]?{...c,...m[c.id]}:c);setCards(up);setCw(up);setReshN(Object.keys(m).length);setReshAsk(false);};
   const go=()=>{setSt({r:0,c:0});const d=shuffle(gd(ft==="all"?ac:ft==="class"?cw:ac.filter(c=>c.g===ft)).slice(0,mc));if(d.length){setQu(d);setCur(d[0]);setFl(false);setSp(false);setTy("");setTr2(null);setVw("review");}};
   const rate=ok=>{if(!cur)return;setAn(ok?"correct":"incorrect");setTimeout(()=>{setAn("");const isRetry=!!cur._retry;if(isRetry&&ok){setSt(s=>({r:s.r+1,c:s.c+1}));setQu(p=>{const r=p.filter(c=>c.id!==cur.id);if(r.length){setCur(r[0]);setFl(false);setSp(false);setTy("");setTr2(null);setTimeout(()=>{if(rf.current)rf.current.focus();},100);}else setVw("summary");return r;});return;}const rep=ok?cur.rep+1:1;const nxt=dueIn(SD[Math.min(rep,6)]);const up=p=>p.map(c=>c.id===cur.id?{...c,rep,nr:nxt,lr:Date.now(),cc:c.cc+(ok?1:0),ic:c.ic+(ok?0:1)}:c);const newCards=cur.g==="class"?cards:up(cards);const newCw=cur.g==="class"?up(cw):cw;if(cur.g==="class")setCw(up);else setCards(up);const today=td();const newDRev=dRev.date===today?{date:today,count:dRev.count+1}:{date:today,count:1};setDRev(newDRev);uStreak(newDRev.count,newCards,newCw);setSt(s=>({r:s.r+1,c:s.c+(ok?1:0)}));setQu(p=>{const r=p.filter(c=>c.id!==cur.id);if(!ok)r.push({...cur,rep,_retry:true});if(r.length){setCur(r[0]);setFl(false);setSp(false);setTy("");setTr2(null);setTimeout(()=>{if(rf.current)rf.current.focus();},100);}else setVw("summary");return r;});},450);};
   const chk=()=>{if(!cur||tr2)return;const r=fm(ty,qd==="en"?cur.p:cur.e);setTr2(r);setFl(true);if(r!=="wrong")setTimeout(()=>rate(true),1e3);};
@@ -164,6 +182,7 @@ export default function App(){
   useEffect(()=>{if(vw!=="review")return;const h=e=>{if(md==="flashcard"&&e.code==="Space"&&!fl){e.preventDefault();setFl(true);}if(fl&&(md==="flashcard"||(md==="typing"&&tr2==="wrong"))){if(e.code==="ArrowLeft"){e.preventDefault();rate(false);}if(e.code==="ArrowRight"){e.preventDefault();rate(true);}}};window.addEventListener("keydown",h);return()=>window.removeEventListener("keydown",h);},[vw,md,fl,tr2]);
   const saveWordEdit=(id)=>{const up=p=>p.map(c=>{if(c.id!==id)return c;const u={...c,h:san(editW.h),p:san(editW.p),e:san(editW.e)};if(editStg!==null){u.rep=editStg;u.nr=dueIn(SD[Math.min(editStg,6)]);}return u;});if(cw.some(c=>c.id===id))setCw(up);else setCards(up);setExpWord(null);setEditStg(null);};
   const mst=ac.filter(c=>c.rep>=6).length,lrn=ac.filter(c=>c.rep>0&&c.rep<6).length,nwc=ac.filter(c=>c.rep===0).length;
+  const oq=gd(ac).filter(c=>c.rep>0).length;
   const ttr=ac.reduce((a,c)=>a+c.cc+c.ic,0),ttc=ac.reduce((a,c)=>a+c.cc,0),acc2=ttr?Math.round(ttc/ttr*100):0;
   const sdd=SL.map((_,i)=>ac.filter(c=>gs(c.rep)===i).length);
   const dFor=k=>gd(ac.filter(c=>c.g===k)).length;
@@ -182,13 +201,15 @@ export default function App(){
         <div style={{background:"#fff",borderRadius:10,padding:12,border:"1px solid #f1f5f9",marginBottom:12}}><div style={{fontSize:10,fontWeight:600,color:"#64748b",marginBottom:6}}>SRS Stages</div><div style={{display:"flex",gap:1,height:6,borderRadius:3,overflow:"hidden",background:"#f1f5f9",marginBottom:6}}>{sdd.map((n,i)=>n>0&&<div key={i} style={{width:`${(n/ac.length)*100}%`,background:SC[i]}}/>)}</div><div style={{display:"flex",flexWrap:"wrap",gap:5}}>{SL.map((l,i)=>sdd[i]>0&&<span key={i} style={{fontSize:9,color:"#64748b",display:"flex",alignItems:"center",gap:2}}><span style={{width:6,height:6,borderRadius:1,background:SC[i],display:"inline-block"}}/>{l}: {sdd[i]}</span>)}</div></div>
         <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:10}}>
           <div style={{display:"flex",alignItems:"center",gap:3}}><span style={{fontSize:9,color:"#94a3b8"}}>Cards:</span>{[10,20,Infinity].map(n=><button key={n} onClick={()=>setMc(n)} style={{...T.ch,...(mc===n?T.cha:{}),padding:"2px 8px",fontSize:9}}>{n===Infinity?"All":n}</button>)}</div>
-          <button onClick={()=>setShowSett(s=>!s)} style={{display:"flex",alignItems:"center",gap:4,background:showSett?"#f1f5f9":"transparent",border:"1px solid "+(showSett?"#e2e8f0":"#e2e8f0"),borderRadius:7,padding:"3px 10px",cursor:"pointer",fontFamily:"inherit",fontSize:10,color:"#94a3b8"}}><span style={{fontSize:13,lineHeight:1}}>⚙</span>Settings</button>
+          <button onClick={()=>{setShowSett(s=>!s);setReshAsk(false);setReshN(0);}} style={{display:"flex",alignItems:"center",gap:4,background:showSett?"#f1f5f9":"transparent",border:"1px solid "+(showSett?"#e2e8f0":"#e2e8f0"),borderRadius:7,padding:"3px 10px",cursor:"pointer",fontFamily:"inherit",fontSize:10,color:"#94a3b8"}}><span style={{fontSize:13,lineHeight:1}}>⚙</span>Settings</button>
         </div>
         {showSett&&<div style={{background:"#fff",borderRadius:10,border:"1px solid #f1f5f9",padding:12,marginBottom:12,animation:"fu .2s ease both"}}>
           <div style={{fontSize:10,fontWeight:600,color:"#64748b",marginBottom:6}}>Mode</div>
           <div style={{display:"flex",background:"#f1f5f9",borderRadius:7,overflow:"hidden",marginBottom:10}}>{["flashcard","typing"].map(m=><button key={m} onClick={()=>setMd(m)} style={{flex:1,padding:"5px 11px",fontSize:10,fontWeight:500,border:"none",cursor:"pointer",fontFamily:"inherit",background:md===m?"#fff":"transparent",color:md===m?"#2d3748":"#94a3b8",boxShadow:md===m?"0 1px 2px rgba(0,0,0,0.05)":"none",borderRadius:md===m?5:0}}>{m==="flashcard"?"📇 Flashcard":"⌨️ Typing"}</button>)}</div>
           <div style={{fontSize:10,fontWeight:600,color:"#64748b",marginBottom:6}}>Quiz Direction</div>
           <div style={{display:"flex",flexDirection:"column",gap:4}}>{[{k:"hz",l:"Hanzi → English"},{k:"py",l:"Pinyin + Hanzi → English"},{k:"en",l:"English → Pinyin + Hanzi"}].map(o=><button key={o.k} onClick={()=>setQd(o.k)} style={{display:"flex",alignItems:"center",gap:8,padding:"6px 10px",borderRadius:7,border:"1px solid "+(qd===o.k?"#e07a5f40":"#f1f5f9"),background:qd===o.k?"#e07a5f08":"#fafbfc",cursor:"pointer",fontFamily:"inherit",textAlign:"left"}}><span style={{width:8,height:8,borderRadius:"50%",border:"2px solid "+(qd===o.k?"#e07a5f":"#cbd5e1"),background:qd===o.k?"#e07a5f":"transparent",flexShrink:0}}/><span style={{fontSize:11,fontWeight:600,color:qd===o.k?"#e07a5f":"#475569"}}>{o.l}</span></button>)}</div>
+          <div style={{fontSize:10,fontWeight:600,color:"#64748b",marginTop:12,marginBottom:6}}>Schedule</div>
+          {reshN>0?<div style={{fontSize:11,color:"#22c55e",fontWeight:600,padding:"8px 10px",borderRadius:7,background:"#f0fdf4",border:"1px solid #bbf7d0"}}>✓ Spread {reshN} card{reshN>1?"s":""} over the coming weeks</div>:reshAsk?<div style={{display:"flex",flexDirection:"column",gap:6}}><p style={{fontSize:10,color:"#94a3b8"}}>Re-date {oq} overdue card{oq>1?"s":""} within their own stage window (a 2w card lands within 2 weeks, a 1m card within a month). New cards stay due now.</p><div style={{display:"flex",gap:6}}><button onClick={doReshuffle} style={{...T.btn,flex:1,padding:8,fontSize:11}}>✓ Confirm</button><button onClick={()=>setReshAsk(false)} style={{flex:1,padding:8,fontSize:11,borderRadius:8,border:"1px solid #e2e8f0",background:"#fff",color:"#94a3b8",cursor:"pointer",fontFamily:"inherit"}}>Cancel</button></div></div>:<button onClick={()=>setReshAsk(true)} disabled={oq===0} style={{...T.btn,...(oq===0?T.bd:{}),padding:9,fontSize:12}}>🔀 Reshuffle {oq} overdue card{oq===1?"":"s"}</button>}
         </div>}
         <div style={{background:"#fff",borderRadius:10,border:"1px solid #f1f5f9",marginBottom:12,overflow:"hidden"}}>
           <button onClick={()=>setFt("all")} style={{...T.fb,...(ft==="all"?{background:"#e07a5f08",color:"#e07a5f"}:{})}}>All words <span style={{fontSize:10,color:ft==="all"?"#e07a5f":"#94a3b8",fontWeight:400}}>({gd(ac).length} due)</span></button>
